@@ -1,0 +1,12 @@
+bin/
+obj/
+data/
+*.user
+analysis/asus.cany/
+analysis/asus.cany
+release/
+*.zip
+artifacts/
+craft-tools.json
+analysis/*
+!analysis/BEHAVIOR.md
