@@ -8,29 +8,40 @@
 
 协议：[GNU GPL v3.0 only](LICENSE)。Ubuntu 上的 Codex 请先阅读 [AGENTS.md](AGENTS.md) 和 [Ubuntu 适配接手说明](docs/UBUNTU_PORT.md)。
 
+## Linux 自动打包
+
+向 `main` 推送、提交 Pull Request、推送 `vX.Y.Z` 标签或手动运行工作流时，GitHub Actions 自动构建 x64 的 DEB 和 RPM。标签构建使用标签中的版本号。在对应运行的 **Artifacts** 中下载 `openoledshifter-linux-x64`，解压即可得到两个安装包。[GitHub Actions](https://github.com/Wenbo-Zhong/openOLEDShifter/actions)
+
+DEB 面向 Ubuntu 26.04。RPM 面向使用 GNOME 50 Wayland 的 Fedora 44，可用 `sudo dnf install ./openoledshifter-0.1.0-1.x86_64.rpm` 安装。两种包都注册 **OpenOLEDShifter** 应用菜单入口。系统加载扩展后，按下面的步骤启用壁纸位移。
+
+本地可用 `./build-ubuntu.sh all` 构建两个包，或用 `./build-ubuntu.sh rpm` 单独构建 RPM。RPM 构建额外需要 `rpmbuild`（Ubuntu 的 `rpm` 包）。
+
 ## Ubuntu 安装与使用
 
-在仓库目录中执行：
+用 `./build-ubuntu.sh` 构建。在 Ubuntu x64 上生成 `release/ubuntu/openoledshifter_0.1.0_amd64.deb`。构建需要 .NET 8 SDK、GJS、`glib-compile-schemas`、`desktop-file-validate` 和 `dpkg-deb`。
 
 ```bash
-./build-ubuntu.sh
-./install-ubuntu.sh
+sudo apt install ./release/ubuntu/openoledshifter_0.1.0_amd64.deb
+```
+
+安装后，在 GNOME 应用面板搜索 **OpenOLEDShifter** 打开设置。首次使用时注销并重新登录，让 GNOME 加载扩展，然后以桌面用户身份启用它：
+
+```bash
 gnome-extensions enable openoledshifter@openoledshifter
 ```
 
-首次安装后，如果 GNOME 提示找不到扩展，注销并重新登录，再运行 `gnome-extensions enable openoledshifter@openoledshifter`。点击顶部面板的显示器图标，打开 **Shift desktop wallpaper** 开始位移。顶部面板的 **Settings** 和应用菜单里的 **OpenOLEDShifter** 打开同一设置窗口，可以调整间隔、最大物理像素偏移，并选择是否在登录时自动开始位移。首次启用扩展时默认关闭位移。
+从应用面板或 GNOME 顶栏的 **Settings** 打开设置，勾选 **启用定时位移** 并保存。设置应用包含运行时，窗口通过 XWayland 显示。关闭窗口后，GNOME 扩展继续执行位移。登录自动开始默认为关闭。
 
-Ubuntu 版只移动本地静态壁纸的显示图层。位移时屏幕边缘可能露出细线。锁屏、休眠、全屏和活动概览期间暂停，返回桌面后重新计时。桌面图标、Dock、顶栏和应用窗口位移，以及多屏、分数缩放、X11、KDE 和幻灯片壁纸，当前均不支持。
+Ubuntu 版支持 GNOME 50 Wayland 单屏、整数缩放下的本地静态壁纸位移。锁屏、休眠、全屏和活动概览期间暂停。桌面图标、Dock、应用窗口、分数缩放和多屏暂不支持。
 
-停用扩展即恢复壁纸原位。卸载命令：
+卸载前先以桌面用户身份停用扩展以恢复原位，再移除软件包：
 
 ```bash
-./install-ubuntu.sh --uninstall
+gnome-extensions disable openoledshifter@openoledshifter
+sudo apt remove openoledshifter
 ```
 
-如需一并清除本扩展的个人设置，执行 `dconf reset -f /org/gnome/shell/extensions/openoledshifter/`。
-
-Ubuntu 从源码构建使用 `./build-ubuntu.sh`，需要 .NET 8 SDK、GJS、`glib-compile-schemas` 和 `gnome-extensions`。构建会运行无桌面测试，并在 `release/ubuntu/` 生成扩展 ZIP 和 `desktop/` 设置应用。Ubuntu 发布包包含运行时，设置窗口通过 XWayland 显示。关闭窗口后 GNOME Shell 继续负责位移。可用 `release/ubuntu/desktop/OpenOLEDShifter --smoke-test` 验证 Avalonia 窗口，测试只渲染静态预览。
+如需清除本扩展的个人设置，执行 `dconf reset -f /org/gnome/shell/extensions/openoledshifter/`。如曾通过旧版 `install-ubuntu.sh` 做用户级安装，先用旧版脚本的 `--uninstall` 选项移除，以免旧入口覆盖软件包提供的入口。
 
 ## Windows 使用
 

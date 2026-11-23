@@ -1,0 +1,53 @@
+name: Linux packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    env:
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gjs libglib2.0-bin desktop-file-utils rpm
+      - name: Build DEB and RPM
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            export PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          ./build-ubuntu.sh all
+      - name: Verify package contents
+        run: |
+          dpkg-deb --contents release/ubuntu/*.deb > deb-contents.txt
+          rpm --query --package --list release/ubuntu/*.rpm > rpm-contents.txt
+          for path in /usr/lib/openoledshifter/OpenOLEDShifter \
+                      /usr/share/applications/org.openoledshifter.Desktop.desktop \
+                      /usr/share/icons/hicolor/512x512/apps/org.openoledshifter.Desktop.png \
+                      /usr/share/gnome-shell/extensions/openoledshifter@openoledshifter/schemas/gschemas.compiled; do
+            grep -Fq ".$path" deb-contents.txt
+            grep -Fxq "$path" rpm-contents.txt
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: openoledshifter-linux-x64
+          path: |
+            release/ubuntu/*.deb
+            release/ubuntu/*.rpm
+          if-no-files-found: error
+          compression-level: 0
