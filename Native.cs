@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
 
+using System.Drawing;
+using System.Windows.Forms;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -9,6 +11,11 @@ namespace OpenOLEDShifter;
 
 internal static class Native
 {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr owner, string text, string caption, uint type);
+
+    internal static void ShowMessage(string text) => MessageBoxW(IntPtr.Zero, text, "OpenOLEDShifter", 0);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct Rect { public int Left, Top, Right, Bottom; public readonly Rectangle Value => Rectangle.FromLTRB(Left, Top, Right, Bottom); }
     [StructLayout(LayoutKind.Sequential)]

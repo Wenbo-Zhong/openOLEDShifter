@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<schemalist>
+  <schema id="org.gnome.shell.extensions.openoledshifter" path="/org/gnome/shell/extensions/openoledshifter/">
+    <key name="start-at-login" type="b">
+      <default>false</default>
+      <summary>Start wallpaper shifting on login</summary>
+    </key>
+    <key name="interval-seconds" type="i">
+      <range min="@MIN_INTERVAL@" max="@MAX_INTERVAL@"/>
+      <default>@DEFAULT_INTERVAL@</default>
+      <summary>Seconds between shifts</summary>
+    </key>
+    <key name="radius" type="i">
+      <range min="@MIN_RADIUS@" max="@MAX_RADIUS@"/>
+      <default>@DEFAULT_RADIUS@</default>
+      <summary>Maximum displacement in physical pixels</summary>
+    </key>
+  </schema>
+</schemalist>

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
 
+using System.Drawing;
+using System.Windows.Forms;
 using System.Text.Json;
 
 namespace OpenOLEDShifter;

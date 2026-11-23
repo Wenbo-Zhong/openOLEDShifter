@@ -1,14 +1,38 @@
 # OpenOLEDShifter
 
-Windows 托盘式 OLED 像素位移工具，针对 ASUS ProArt P16 的 AsusOLEDShifter 1.0.21.0 做静态分析后独立实现。无需华硕软件、管理员权限或内核驱动。
+适用于 Windows 和 Ubuntu 的 OLED 像素位移工具，针对 ASUS ProArt P16 的 AsusOLEDShifter 1.0.21.0 做静态分析后独立实现。无需华硕软件、管理员权限或内核驱动。
 
-**当前可运行平台：Windows x64。Ubuntu 适配尚未实现。** 项目希望逐步补齐 Linux 上没有 MyASUS 时的 OLED 保护体验；本仓库先聚焦像素位移，不把其他硬件管理功能混在一起。
+**Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持单屏、整数缩放。两端共享 Avalonia 设置窗口、默认参数和九点往返轨迹。
 
 ![OpenOLEDShifter icon](assets/app-icon.png)
 
 协议：[GNU GPL v3.0 only](LICENSE)。Ubuntu 上的 Codex 请先阅读 [AGENTS.md](AGENTS.md) 和 [Ubuntu 适配接手说明](docs/UBUNTU_PORT.md)。
 
-## 使用
+## Ubuntu 安装与使用
+
+在仓库目录中执行：
+
+```bash
+./build-ubuntu.sh
+./install-ubuntu.sh
+gnome-extensions enable openoledshifter@openoledshifter
+```
+
+首次安装后，如果 GNOME 提示找不到扩展，注销并重新登录，再运行 `gnome-extensions enable openoledshifter@openoledshifter`。点击顶部面板的显示器图标，打开 **Shift desktop wallpaper** 开始位移。顶部面板的 **Settings** 和应用菜单里的 **OpenOLEDShifter** 打开同一设置窗口，可以调整间隔、最大物理像素偏移，并选择是否在登录时自动开始位移。首次启用扩展时默认关闭位移。
+
+Ubuntu 版只移动本地静态壁纸的显示图层。位移时屏幕边缘可能露出细线。锁屏、休眠、全屏和活动概览期间暂停，返回桌面后重新计时。桌面图标、Dock、顶栏和应用窗口位移，以及多屏、分数缩放、X11、KDE 和幻灯片壁纸，当前均不支持。
+
+停用扩展即恢复壁纸原位。卸载命令：
+
+```bash
+./install-ubuntu.sh --uninstall
+```
+
+如需一并清除本扩展的个人设置，执行 `dconf reset -f /org/gnome/shell/extensions/openoledshifter/`。
+
+Ubuntu 从源码构建使用 `./build-ubuntu.sh`，需要 .NET 8 SDK、GJS、`glib-compile-schemas` 和 `gnome-extensions`。构建会运行无桌面测试，并在 `release/ubuntu/` 生成扩展 ZIP 和 `desktop/` 设置应用。Ubuntu 发布包包含运行时，设置窗口通过 XWayland 显示。关闭窗口后 GNOME Shell 继续负责位移。可用 `release/ubuntu/desktop/OpenOLEDShifter --smoke-test` 验证 Avalonia 窗口，测试只渲染静态预览。
+
+## Windows 使用
 
 运行 `release\OpenOLEDShifter.exe`，通过托盘图标打开设置。关闭设置窗口后仍在托盘运行，右键选择“退出并恢复”结束。
 
@@ -36,7 +60,7 @@ Windows 托盘式 OLED 像素位移工具，针对 ASUS ProArt P16 的 AsusOLEDS
 
 任务栏、壁纸和 Explorer 图标层属于桌面共享状态。崩溃或直接强杀后可能暂留偏移，重新启动本工具将尝试还原。恢复记录中的原始壁纸文件需要继续存在。
 
-## 构建和测试
+## Windows 构建和测试
 
 要求 Windows 10/11 x64、.NET 8 SDK；运行发布包要求 .NET 8 Desktop Runtime（本机已有）。
 
@@ -54,6 +78,6 @@ Windows 托盘式 OLED 像素位移工具，针对 ASUS ProArt P16 的 AsusOLEDS
 
 ## 开源与贡献
 
-代码、图标及项目文档以 **GPL-3.0-only** 发布，完整条款见 `LICENSE`。项目当前没有引入第三方运行时 NuGet 依赖；.NET 本身保留其各自许可证。图标生成脚本需要 Pillow，但生成的图标已提交，正常构建不需要安装 Python/Pillow。
+代码、图标及项目文档以 **GPL-3.0-only** 发布，完整条款见 `LICENSE`。Avalonia UI 及其运行时依赖、.NET 均保留各自许可证。图标生成脚本需要 Pillow，但生成的图标已提交，正常构建不需要安装 Python/Pillow。
 
 欢迎提交 Ubuntu、其他 Linux 桌面和 Windows 改进。新增后端需要明确桌面环境、会话类型（X11/Wayland）、支持范围和还原行为，不能只在设置里增加开关而没有实际实现。

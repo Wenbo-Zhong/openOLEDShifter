@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
 
+using System.Drawing;
+using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -92,7 +94,7 @@ internal sealed class ShiftEngine
         if (h == IntPtr.Zero || !Native.IsWindow(h) || !Native.IsWindowVisible(h) || Native.IsIconic(h)) return;
         Rectangle rect = Native.BoundsInParent(h);
         var existing = state.Windows.FirstOrDefault(x => x.Handle == h.ToInt64());
-        if (existing != null && (!Identity(existing) || rect.Location != existing.Last || rect.Size != existing.Size))
+        if (existing != null && (!Identity(existing) || !ShiftPolicy.StillOwned(rect.Location, existing.Last) || rect.Size != existing.Size))
         {
             // User, Explorer or another app moved it. Adopt its new position instead of undoing it.
             state.Windows.Remove(existing); existing = null;
@@ -201,7 +203,7 @@ internal sealed class ShiftEngine
                     else
                     {
                         Rectangle current = Native.BoundsInParent(h);
-                        if (current.Location == item.Last && current.Size == item.Size && !Native.IsIconic(h))
+                        if (ShiftPolicy.StillOwned(current.Location, item.Last) && current.Size == item.Size && !Native.IsIconic(h))
                         if (!Native.Move((IntPtr)item.Handle, item.Origin)) throw new InvalidOperationException("窗口原位恢复失败");
                     }
                 }

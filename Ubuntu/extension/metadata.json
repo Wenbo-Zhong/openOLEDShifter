@@ -1,0 +1,9 @@
+{
+  "uuid": "openoledshifter@openoledshifter",
+  "name": "OpenOLEDShifter",
+  "description": "Pixel shifting for the GNOME desktop wallpaper on single-monitor Wayland sessions.",
+  "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.openoledshifter",
+  "session-modes": ["user", "unlock-dialog"],
+  "version": 1
+}

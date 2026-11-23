@@ -4,7 +4,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-dotnet publish .\OpenOLEDShifter.csproj -c Release -o .\release --self-contained false --nologo
+dotnet publish .\OpenOLEDShifter.csproj -c Release -r win-x64 -o .\release --self-contained false --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 Copy-Item -LiteralPath .\README.md -Destination .\release\README.md -Force
 Copy-Item -LiteralPath .\LICENSE -Destination .\release\LICENSE -Force

@@ -1,8 +1,8 @@
-# Ubuntu / Codex 接手说明
+# Ubuntu 移植与验证
 
 ## 用户目标
 
-用户希望在 Ubuntu 没有 MyASUS 的情况下，逐步获得相似的 OLED 保护体验。第一步是本项目的像素位移和常驻控制；不是一次性重写所有 MyASUS 功能。Windows 原型已完成，此次发布只准备 Ubuntu 接手材料，**尚未实现 Linux 后端**。
+用户希望在 Ubuntu 没有 MyASUS 的情况下，逐步获得相似的 OLED 保护体验。第一步是本项目的像素位移和常驻控制；不是一次性重写所有 MyASUS 功能。当前已实现 GNOME 50 Wayland 单屏静态壁纸后端，安装步骤见 [README](../README.md#ubuntu-安装与使用)。
 
 目标笔记本是 ASUS ProArt P16 H7606WI，3840×2400 内屏。Ubuntu 上的显示器、缩放、驱动及桌面会话必须现场探测，不能照搬 Windows 设备名 `\\.\DISPLAY1`。使用普通桌面用户运行。
 
@@ -19,51 +19,26 @@
 
 Windows 原型按端点往返方式使用这些点，壁纸每次从原图重绘，图标层从初始坐标计算偏移。没有证明原版所有机型/分支都使用完全相同的图像处理或 FSE 激活规则。细节与证据 ID 见 `analysis/BEHAVIOR.md`。
 
-Windows 代码无第三方 NuGet 包；使用 WinForms、Win32、COM、GDI+。11 项自测覆盖轨迹、渲染、恢复、手动移动和最小化；这些不是 Ubuntu 的集成测试。
+Windows 位移后端使用 Win32、COM、GDI+，监视器查询及测试夹具使用 WinForms。桌面设置与托盘使用 Avalonia UI。11 项自测覆盖轨迹、渲染、恢复、手动移动和最小化；这些不是 Ubuntu 的集成测试。
 
-## 建议分阶段交付
+## 已实现
 
-### 1. 可在 Linux 构建的核心
+- `Core/ShiftPolicy.cs` 保存两端使用的默认参数、半径范围和轨迹。Windows 继续使用原有桌面入口。Ubuntu 的构建工具验证核心并为 GNOME 扩展生成轨迹和设置范围。
+- GNOME Shell 扩展只操作桌面壁纸 actor。物理偏移除以显示器的整数缩放系数后写入逻辑坐标。位移以零平移为基准。扩展只在实际平移仍匹配最后写入值时恢复，遇到其他组件改变平移时暂停该 actor。GNOME 更换壁纸时使用新 actor。
+- 扩展在写入前记录恢复意图。该记录与图层状态都位于 Shell 进程内，退出或崩溃时由 compositor 一并销毁。壁纸设置和源文件无需持久化恢复。
+- 顶部面板可按会话启停。两端共用 `Desktop/` 中的 Avalonia 设置窗口和输入校验。Ubuntu 窗口通过会话 D-Bus 读取状态并提交设置，GNOME 扩展负责调度与位移。扩展停用时释放 D-Bus 对象、定时器、监听器和图层平移。
 
-提取轨迹、节流/暂停状态机、配置验证和恢复所有权策略。使用自己的整数坐标类型，避免 UI/绘图库侵入核心。新增 Ubuntu 可执行的 headless 测试；保持原 Windows 入口可构建。用平台接口区分壁纸、图标层、窗口、面板和会话事件。
+## 验证环境
 
-### 2. Ubuntu 常驻入口
+- 目标桌面为 Ubuntu 26.04.1 LTS、GNOME Shell 50.1、Wayland。Mutter 报告单个内屏 `eDP-1` 位于 `(0, 0)`，3840×2400 @ 60 Hz，200% 缩放。
+- 使用同一系统上的独立 GNOME Shell Wayland 会话、私有 D-Bus 和临时设置目录，运行 1920×1200 虚拟显示器和合成壁纸。在 200% 下，对偏移前后截图的中央区域逐像素比较，确认向右移动 1 个输出像素，停止后区域恢复一致。还验证了换壁纸、停用扩展和设置窗口。测试会话退出后清理临时文件。
+- Avalonia 迁移后，Ubuntu 自包含应用在本机 XWayland 会话的 200% 缩放下通过窗口渲染测试。隔离 GNOME 会话验证了安装、卸载、状态读取、设置提交、立即位移和暂停。
+- 实体 OLED、实际锁屏和系统休眠、热插拔、分数缩放和其他桌面环境仍需验证。Windows 项目在 Ubuntu 上交叉编译通过。Windows 自测和托盘 smoke test 仍需 Windows 桌面。
 
-先检测 Ubuntu、桌面版本和 X11/Wayland；提供状态、启停、间隔/半径和诊断。选择实际可用的状态指示器/托盘或 GNOME 面板入口，保证没有托盘扩展时也能打开控制界面。配置使用 XDG 目录；登录启动 opt-in，提供卸载步骤。
+## 后续范围
 
-### 3. 桌面后端
-
-**GNOME / Wayland：** 不要把 Windows 的 `SetWindowPos` 翻译成 xdotool。标准 Wayland 客户端没有通用的全局窗口操控能力。可先评估独立 GNOME Shell 扩展：在 compositor 内对合适的背景/窗口 actor 做可逆变换，并按 GNOME 版本验证。GNOME 扩展会成为 Shell 的一部分，故需特别检查 disable、锁屏和崩溃后的还原。不能把整个 compositor framebuffer 的位移当作已获得的能力。若改用重绘壁纸的方案，明确只保护壁纸，并尊重暗色/亮色背景和幻灯片设置。
-
-**X11：** 可以评估 X11/EWMH 对白名单窗口的有限位移，但要检查 WM 的限制、全屏/最大化、多屏及缩放。不要把所有窗口强制取消最大化。图标可能属于 GNOME Desktop Icons 扩展或其他桌面进程，不能假设存在 Windows 的统一图标层。
-
-**KDE / 其他桌面：** 明确分开后端，探测 capabilities。不能让 GNOME 的设置键或 Shell API 在其他桌面上被静默调用。
-
-任务栏在 Ubuntu 对应的可能是 Ubuntu Dock、GNOME 顶栏或其他面板。它们属于不同组件，自动隐藏应是可选能力，不应为本工具安装而覆盖用户配置。
-
-### 4. 实机验证与发布
-
-至少验证：缩放前后真实物理偏移、负坐标双屏、插拔屏幕、锁屏、休眠/恢复、退出、强杀后重启、用户主动更换背景、后台空闲资源、扩展 disable/uninstall 的完整清理。测试不得无提示改变用户的工作桌面；先用专门测试会话或明确选择的 fixture。
-
-初期支持矩阵应明确写出“Ubuntu 版本 + GNOME/KDE 版本 + X11/Wayland”，未测试组合标为未验证。不要笼统宣称“Linux 全支持”或量化防烧屏效果。
-
-## 上线前不变条件
-
-1. 位移有界，不累积漂移，禁用/退出恢复。
-2. 恢复记录只能还原本工具仍持有的状态，不覆盖用户后续操作。
-3. 没有 root 常驻进程，不关闭 Wayland 安全约束，不批量修改其他服务。
-4. 不改 ICC 配置、屏幕校色或 GPU 驱动；不声称提供面板硬件补偿。
-5. 默认 200 秒/1 像素；调参和登录启动由用户选择。
-6. 不支持的功能在界面和文档中明确显示。
-
-## 可直接给 Ubuntu Codex 的请求
-
-> 阅读 AGENTS.md、docs/UBUNTU_PORT.md 和 analysis/BEHAVIOR.md。检查我的 Ubuntu 桌面环境、版本、会话类型和显示缩放。在保留 Windows 实现的前提下，先提取可跨平台测试的核心，再实现本机可用的 Ubuntu 常驻界面和像素位移后端。对 Wayland、桌面图标和面板的限制如实报告，分阶段交付实际可运行的能力。保留 GPL-3.0-only。
-
-## 参考
+多屏和分数缩放需要单独验证不同缩放与坐标原点。桌面图标、面板和窗口各自属于不同桌面组件。X11 和 KDE 需要独立后端。现行扩展会限制到 GNOME 50，不会调整其他扩展或系统安全设置。
 
 - [GNOME Shell 扩展开发与架构](https://gjs.guide/extensions/overview/architecture.html)
 - [创建 GNOME Shell 扩展](https://gjs.guide/extensions/development/creating.html)
 - [Wayland / xdg-shell 协议](https://wayland.app/protocols/xdg-shell)
-
-这些是后续适配入口，不代表已验证某个特定 Shell actor 或扩展方案适用于用户的 Ubuntu 版本。
