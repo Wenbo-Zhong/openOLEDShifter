@@ -4,6 +4,8 @@
 
 **Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持单屏、整数缩放。两端共享 Avalonia 设置窗口、默认参数和九点往返轨迹。
 
+框架已统一为 **Avalonia + .NET 8**：设置、后台命令接口、连接控制及核心逻辑各维护一份，Windows 的 Win32/COM 和 Ubuntu 的 GNOME/D-Bus 操作分别放在平台后端。[共享架构说明](docs/ARCHITECTURE.md)
+
 ![OpenOLEDShifter icon](assets/app-icon.png)
 
 协议：[GNU GPL v3.0 only](LICENSE)。Ubuntu 上的 Codex 请先阅读 [AGENTS.md](AGENTS.md) 和 [Ubuntu 适配接手说明](docs/UBUNTU_PORT.md)。
@@ -73,10 +75,11 @@ sudo apt remove openoledshifter
 
 ## Windows 构建和测试
 
-要求 Windows 10/11 x64、.NET 8 SDK；运行发布包要求 .NET 8 Desktop Runtime（本机已有）。
+要求 Windows 10/11 x64、.NET 8 SDK；运行依赖框架的发布包要求 .NET 8 Runtime。无需 WinForms 或 Windows Desktop Runtime。
 
 ```powershell
 .\build.ps1
+dotnet run --project Tests/CoreTests.csproj -c Release
 .\release\OpenOLEDShifter.exe --self-test
 .\release\OpenOLEDShifter.exe --smoke-test
 ```

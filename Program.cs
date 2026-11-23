@@ -2,7 +2,6 @@
 // Copyright (c) 2026 OpenOLEDShifter contributors
 
 using System.Drawing;
-using System.Windows.Forms;
 using System.Text.Json;
 
 namespace OpenOLEDShifter;
@@ -15,7 +14,7 @@ internal static class Program
     {
         if (args.Contains("--self-test"))
         {
-            ApplicationConfiguration.Initialize();
+            Native.SetProcessDpiAwarenessContext((IntPtr)(-4));
             SelfTests.Run();
             return;
         }
@@ -63,45 +62,27 @@ internal static class Program
     }
 }
 
-internal sealed class Preferences
+internal static class Preferences
 {
-    public int IntervalSeconds { get; set; } = ShiftPolicy.DefaultInterval;
-    public int Radius { get; set; } = ShiftPolicy.DefaultRadius;
-    public bool Enabled { get; set; } = true;
-    public bool Wallpaper { get; set; } = true;
-    public bool Icons { get; set; } = Screen.AllScreens.Length == 1;
-    public bool AutoHideTaskbar { get; set; }
-    public bool PauseFullscreen { get; set; } = true;
-    public bool FseWindows { get; set; } = true;
-    public string Monitor { get; set; } = Screen.PrimaryScreen?.DeviceName ?? "";
-    public string WindowProcesses { get; set; } = "";
-    public static Preferences Load()
+    private static DesktopSettings Default() => new(Enabled: true, Icons: WindowsDisplay.AllScreens.Length == 1,
+        FseWindows: true, Monitor: WindowsDisplay.PrimaryScreen?.DeviceName ?? "");
+    public static DesktopSettings Load()
     {
         string path = Path.Combine(Program.DataDir, "settings.json");
-        if (!File.Exists(path)) return new();
+        if (!File.Exists(path)) return Default();
         try
         {
-            var p = JsonSerializer.Deserialize<Preferences>(File.ReadAllText(path)) ?? new();
-            p.IntervalSeconds = Math.Clamp(p.IntervalSeconds, ShiftPolicy.MinInterval, ShiftPolicy.MaxInterval);
-            p.Radius = Math.Clamp(p.Radius, ShiftPolicy.MinRadius, ShiftPolicy.MaxRadius);
-            p.Monitor ??= ""; p.WindowProcesses ??= "";
-            return p;
+            return (JsonSerializer.Deserialize<DesktopSettings>(File.ReadAllText(path)) ?? Default()).Normalize();
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
-        { Program.Log("Settings load failed: " + e.Message); return new(); }
+        { Program.Log("Settings load failed: " + e.Message); return Default(); }
     }
-    public void Save() => Store.Write(Path.Combine(Program.DataDir, "settings.json"), this);
+    public static void Save(DesktopSettings settings) => Store.Write(Path.Combine(Program.DataDir, "settings.json"), settings.Validate());
 }
 
 internal static class Store
 {
-    public static void Write<T>(string path, T value)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        string temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(temp, path, true);
-    }
+    public static void Write<T>(string path, T value) => AtomicJsonStore.Write(path, value);
 }
 
 internal static class Orbit

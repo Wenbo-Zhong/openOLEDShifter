@@ -4,11 +4,4 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
     <AvaloniaResource Include="$(MSBuildThisFileDirectory)../assets/app-icon.png" Link="Assets/app-icon.png" />
   </ItemGroup>
-  <!-- Avalonia's XAML tooling requires a newer Roslyn than the .NET 8 SDK.
-       The shared C# UI does not use that tooling. -->
-  <Target Name="RemoveUnusedAvaloniaAnalyzers" BeforeTargets="CoreCompile">
-    <ItemGroup>
-      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.Filename)' == 'Avalonia.Analyzers.CSharp' Or '%(Analyzer.Filename)' == 'Avalonia.Generators'" />
-    </ItemGroup>
-  </Target>
 </Project>

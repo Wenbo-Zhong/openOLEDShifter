@@ -28,6 +28,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends gjs libglib2.0-bin desktop-file-utils rpm
       - name: Build DEB and RPM
         run: |
+          dotnet run --project Tests/CoreTests.csproj -c Release
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             export PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
           fi

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 OpenOLEDShifter contributors
 
 using System.Drawing;
-using System.Windows.Forms;
+using Screen = OpenOLEDShifter.WindowsDisplay;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -46,20 +46,19 @@ internal sealed class ShiftEngine
 {
     private readonly string journal;
     private RecoveryState state;
-    private int step;
+    private readonly ShiftCycle cycle = new();
     public Point Offset { get; private set; }
     public string Detail { get; private set; } = "等待位移";
     public ShiftEngine(string? journalPath = null) { journal = journalPath ?? Path.Combine(Program.DataDir, "recovery.json"); state = RecoveryState.Load(journal); }
     internal void ShiftFixture(IntPtr handle, Point offset) => ShiftWindow(handle, false, offset);
     private void Save() => Store.Write(journal, state);
 
-    public void Shift(Preferences settings)
+    public void Shift(DesktopSettings settings)
     {
-        var orbit = Orbit.Points(settings.Radius);
-        step = (step + 1) % (2 * (orbit.Count - 1));
-        Offset = orbit[Orbit.PingPong(step, orbit.Count)];
+        var frame = cycle.Advance(settings.Radius);
+        Offset = new Point(frame.Offset.X, frame.Offset.Y);
         List<string> errors = [];
-        if (settings.Wallpaper) Attempt(() => ShiftWallpapers(settings), errors);
+        if (settings.Wallpaper) Attempt(() => ShiftWallpapers(settings, frame.PointIndex), errors);
         if (settings.Icons) Attempt(() => ShiftWindow(Native.DesktopView(), true, Offset), errors);
         if (settings.AutoHideTaskbar) Attempt(() =>
         {
@@ -124,11 +123,11 @@ internal sealed class ShiftEngine
         }
     }
     private const int settingsMargin = 8;
-    private void ShiftAllowedWindows(Preferences settings)
+    private void ShiftAllowedWindows(DesktopSettings settings)
     {
         IntPtr foreground = Native.GetForegroundWindow();
         if (settings.FseWindows && Native.IsVendorFseWindow(foreground) && Native.Fullscreen(settings.Monitor))
-            ShiftWindow(foreground, false, Orbit.Points(1)[Orbit.PingPong(step, 9)], true);
+            ShiftWindow(foreground, false, Orbit.Points(1)[Orbit.PingPong(cycle.Phase, 9)], true);
         var names = settings.WindowProcesses.Split([',', ';', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Select(x => Path.GetFileNameWithoutExtension(x)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Native.EnumWindows((h, _) =>
@@ -151,7 +150,7 @@ internal sealed class ShiftEngine
             state.Windows.Remove(item); Save();
         }
     }
-    private void ShiftWallpapers(Preferences settings)
+    private void ShiftWallpapers(DesktopSettings settings, int pointIndex)
     {
         using var api = new WallpaperApi();
         api.Api.GetStatus(out int status);
@@ -175,7 +174,7 @@ internal sealed class ShiftEngine
             string original = record?.Original ?? current;
             if (string.IsNullOrWhiteSpace(original) || !File.Exists(original)) continue;
             string cache = Path.Combine(Program.DataDir, "wallpapers"); Directory.CreateDirectory(cache);
-            string output = Path.Combine(cache, $"monitor-{i}-{Orbit.PingPong(step, Orbit.Points(settings.Radius).Count)}.png");
+            string output = Path.Combine(cache, $"monitor-{i}-{pointIndex}.png");
             using (var input = Image.FromFile(original))
             using (var bitmap = WallpaperRenderer.Render(input, bounds.Size, position, Color.FromArgb((int)(bg & 255), (int)((bg >> 8) & 255), (int)((bg >> 16) & 255)), Offset))
             {
@@ -230,7 +229,7 @@ internal sealed class ShiftEngine
                 if (Native.TaskbarState() == state.TaskbarLast) Native.TaskbarState(state.TaskbarOriginal.Value);
                 state.TaskbarOriginal = state.TaskbarLast = null;
             }, errors);
-        Save(); step = 0; Offset = Point.Empty;
+        Save(); cycle.Reset(); Offset = Point.Empty;
         Detail = errors.Count == 0 ? "已恢复原位" : "恢复未完成：" + string.Join("；", errors);
         return errors.Count == 0;
     }

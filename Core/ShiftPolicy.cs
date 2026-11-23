@@ -3,9 +3,11 @@
 
 namespace OpenOLEDShifter;
 
-internal readonly record struct PixelOffset(int X, int Y);
+public readonly record struct PixelOffset(int X, int Y);
 
-internal static class ShiftPolicy
+public readonly record struct ShiftFrame(PixelOffset Offset, int PointIndex, int NextPhase);
+
+public static class ShiftPolicy
 {
     public const int DefaultInterval = 200;
     public const int MinInterval = 10;
@@ -37,6 +39,24 @@ internal static class ShiftPolicy
         }
         return result;
     }
+    private static readonly IReadOnlyList<ShiftFrame>[] cycles = Enumerable
+        .Range(MinRadius, MaxRadius - MinRadius + 1)
+        .Select(radius =>
+        {
+            var points = Points(radius);
+            int period = 2 * (points.Count - 1);
+            return (IReadOnlyList<ShiftFrame>)Array.AsReadOnly(Enumerable.Range(0, period).Select(phase =>
+            {
+                int index = PingPong(phase, points.Count);
+                return new ShiftFrame(points[index], index, (phase + 1) % period);
+            }).ToArray());
+        }).ToArray();
+
+    public static IReadOnlyList<ShiftFrame> Frames(int radius) =>
+        radius is >= MinRadius and <= MaxRadius
+            ? cycles[radius - MinRadius]
+            : throw new ArgumentOutOfRangeException(nameof(radius));
+
     public static int PingPong(int step, int count)
     {
         if (count <= 1) return 0;

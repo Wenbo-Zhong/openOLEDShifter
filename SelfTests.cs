@@ -2,7 +2,6 @@
 // Copyright (c) 2026 OpenOLEDShifter contributors
 
 using System.Drawing;
-using System.Windows.Forms;
 using System.Text.Json;
 
 namespace OpenOLEDShifter;
@@ -63,8 +62,8 @@ internal static class SelfTests
                 string file=Path.Combine(testDir,"roundtrip.json");Store.Write(file,data);var loaded=RecoveryState.Load(file);
                 Check(loaded.Windows[0].Origin==new Point(-200,50));Check(loaded.Windows[0].Size==new Size(300,200));Check(loaded.Wallpapers[0].Original=="original.png");
             });
-            using var fixture=new Form { Text="OpenOLEDShifter isolated test fixture",StartPosition=FormStartPosition.Manual,Bounds=new Rectangle(100,100,320,200),ShowInTaskbar=false };
-            fixture.Show(); Application.DoEvents();
+            using var fixture=new NativeFixture();
+            fixture.Show(); NativeFixture.Pump();
             var origin=Native.BoundsInParent(fixture.Handle).Location;
             Test("real Win32 move then restore only our test window", () =>
             {
@@ -86,9 +85,9 @@ internal static class SelfTests
             Test("minimized window restores normal position without being unminimized", () =>
             {
                 var engine=new ShiftEngine(Path.Combine(testDir,"minimized.json"));engine.ShiftFixture(fixture.Handle,new(1,1));
-                fixture.WindowState=FormWindowState.Minimized;Application.DoEvents();
-                Check(engine.Restore());Check(fixture.WindowState==FormWindowState.Minimized);
-                fixture.WindowState=FormWindowState.Normal;Application.DoEvents();
+                fixture.Minimize();NativeFixture.Pump();
+                Check(engine.Restore());Check(Native.IsIconic(fixture.Handle));
+                fixture.Restore();NativeFixture.Pump();
                 Check(Native.BoundsInParent(fixture.Handle).Location==origin);
             });
             Test("wallpaper COM interface reads monitors without modification", () =>

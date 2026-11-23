@@ -10,7 +10,7 @@ import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {cycles} from './cycles.js';
+import {cycles, scheduleTransitions} from './cycles.js';
 import {WallpaperTranslation} from './translation.js';
 
 const desktopInterface = `<node>
@@ -33,6 +33,7 @@ export default class OpenOLEDShifter extends Extension {
         this._background = new Gio.Settings({schema_id: 'org.gnome.desktop.background'});
         this._interface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._login = LoginManager.getLoginManager();
+        this._sleeping = false;
         this._requested = this._settings.get_boolean('start-at-login');
         this._timer = 0;
         this._translation = null;
@@ -66,7 +67,6 @@ export default class OpenOLEDShifter extends Extension {
             [Main.overview, 'showing'],
             [Main.overview, 'hidden'],
             [global.display, 'in-fullscreen-changed'],
-            [this._login, 'prepare-for-sleep'],
             [this._settings, 'changed::interval-seconds'],
             [this._settings, 'changed::radius'],
             [this._background, 'changed'],
@@ -76,6 +76,12 @@ export default class OpenOLEDShifter extends Extension {
             this._signals.push([object, id]);
         }
         this._restart();
+        const sleepSignal = this._login.connect('prepare-for-sleep', (_manager, sleeping) => {
+            this._sleeping = sleeping;
+            if (this._requested)
+                this._poll();
+        });
+        this._signals.push([this._login, sleepSignal]);
         this._desktopApi = Gio.DBusExportedObject.wrapJSObject(desktopInterface, this);
         this._desktopApi.export(Gio.DBus.session, '/org/openoledshifter/Desktop');
     }
@@ -112,10 +118,8 @@ export default class OpenOLEDShifter extends Extension {
     }
 
     Shift() {
-        if (this._requested && this._step === 0 && !this._translation)
-            this._tick();
         if (this._requested)
-            this._tick();
+            this._poll(true);
         return this.GetState();
     }
 
@@ -134,7 +138,7 @@ export default class OpenOLEDShifter extends Extension {
         const monitor = monitors[0];
         if (!Number.isInteger(monitor.geometry_scale) || monitor.geometry_scale < 1)
             return 'Unsupported: requires integer display scaling';
-        if (Main.sessionMode.isLocked || this._login.preparingForSleep ||
+        if (Main.sessionMode.isLocked || this._sleeping ||
             Main.overview.visible || monitor.inFullscreen)
             return 'Paused: session, overview or full-screen activity';
         const style = this._background.get_string('picture-options');
@@ -158,23 +162,44 @@ export default class OpenOLEDShifter extends Extension {
         this._translation = null;
     }
 
-    _tick() {
+    _poll(force = false) {
         const target = this._availability();
-        if (typeof target === 'string') {
+        const reason = typeof target === 'string' ? target : '';
+        const now = GLib.get_monotonic_time();
+        // The bit order and transition table come from the shared core.
+        const flags = (reason ? 1 : 0)
+            | (reason !== this._pauseReason ? 2 : 0)
+            | (this._pauseReason ? 4 : 0)
+            | (now >= this._due ? 8 : 0)
+            | (force ? 16 : 0);
+        const decision = scheduleTransitions[flags];
+        this._pauseReason = reason;
+        if (decision.ResetDeadline)
+            this._due = now + this._interval;
+        if (decision.Restore) {
             this._release();
-            this._step = 0;
-            this._status.label.text = target;
+            this._phase = 0;
+        }
+        if (reason) {
+            this._status.label.text = reason;
             return;
         }
+        if (decision.Shift)
+            this._shift(target);
+        else if (!this._translation)
+            this._status.label.text = 'Waiting for the next wallpaper shift';
+    }
 
+    _shift(target) {
         const {actor, scale} = target;
         if (this._translation?.actor !== actor) {
             this._release();
             this._translation = new WallpaperTranslation(actor);
-            this._step = 0;
+            this._phase = 0;
         }
         const cycle = cycles[this._settings.get_int('radius')];
-        const [x, y] = cycle[this._step];
+        const next = cycle[this._phase][2];
+        const [x, y] = cycle[next];
         if (!this._translation.shift(x, y, scale)) {
             this._release();
             this._status.label.text = 'Paused: another component moved the wallpaper';
@@ -182,7 +207,7 @@ export default class OpenOLEDShifter extends Extension {
         }
 
         this._status.label.text = `Wallpaper offset: ${x}, ${y} physical px`;
-        this._step = (this._step + 1) % cycle.length;
+        this._phase = next;
     }
 
     _stop() {
@@ -200,13 +225,15 @@ export default class OpenOLEDShifter extends Extension {
             return;
         }
 
-        this._step = 0;
-        this._tick();
-        this._timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
-            this._settings.get_int('interval-seconds'), () => {
-                this._tick();
-                return GLib.SOURCE_CONTINUE;
-            });
+        this._phase = 0;
+        this._interval = this._settings.get_int('interval-seconds') * 1_000_000;
+        this._pauseReason = '';
+        this._due = GLib.get_monotonic_time() + this._interval;
+        this._poll();
+        this._timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
+            this._poll();
+            return GLib.SOURCE_CONTINUE;
+        });
     }
 
     disable() {

@@ -9,13 +9,6 @@ using Avalonia.Platform;
 
 namespace OpenOLEDShifter;
 
-internal sealed record MonitorChoice(string Id, string Name);
-
-internal sealed record DesktopSettings(
-    int IntervalSeconds, int Radius, bool Enabled, bool StartAtLogin,
-    bool Wallpaper = true, bool Icons = false, bool AutoHideTaskbar = false,
-    bool PauseFullscreen = true, bool FseWindows = false, string Monitor = "", string WindowProcesses = "");
-
 internal sealed class SettingsWindow : Window
 {
     private readonly TextBlock status = new() { TextWrapping = TextWrapping.Wrap };
@@ -35,13 +28,17 @@ internal sealed class SettingsWindow : Window
     private readonly Button pause = new() { Content = "暂停并还原" };
     private readonly Button shift = new() { Content = "立即位移" };
     private readonly StackPanel fields = new() { Spacing = 9 };
-    private readonly bool windows;
+    private readonly DesktopCapabilities capabilities;
     private bool busy, available;
+    private bool loading;
+    public bool IsDirty { get; private set; }
 
-    public SettingsWindow(IReadOnlyList<MonitorChoice>? monitorChoices,
+    public SettingsWindow(DesktopCapabilities capabilities,
         Func<DesktopSettings, Task> apply, Func<Task> restore, Func<Task> shiftOnce)
     {
-        windows = monitorChoices is not null;
+        this.capabilities = capabilities;
+        var monitorChoices = capabilities.Monitors;
+        bool windows = capabilities.Features.HasFlag(DesktopFeatures.MonitorSelection);
         Title = "OpenOLEDShifter · OLED 像素位移";
         Width = 620;
         Height = windows ? 810 : 460;
@@ -54,7 +51,7 @@ internal sealed class SettingsWindow : Window
         var heading = new TextBlock { Text = "OLED 像素位移", FontSize = 26, FontWeight = FontWeight.SemiBold };
         var platform = new TextBlock
         {
-            Text = windows ? "Windows 桌面" : "Ubuntu · GNOME 壁纸",
+            Text = capabilities.Name,
             Opacity = 0.72,
         };
         var statusPanel = new Border
@@ -69,16 +66,22 @@ internal sealed class SettingsWindow : Window
         fields.Children.Add(Row("最大偏移（物理像素）", radius));
         fields.Children.Add(startup);
 
-        if (monitorChoices is not null)
+        foreach (var (feature, option) in new[] {
+            (DesktopFeatures.Wallpaper, wallpaper), (DesktopFeatures.Icons, icons),
+            (DesktopFeatures.AutoHideTaskbar, taskbar), (DesktopFeatures.PauseFullscreen, fullscreen),
+            (DesktopFeatures.FseWindows, fse) })
+            if (capabilities.Features.HasFlag(feature)) fields.Children.Add(option);
+        if (windows && monitorChoices is not null)
         {
             monitors.ItemsSource = monitorChoices.Select(choice => new ComboBoxItem
             {
                 Content = choice.Name,
                 Tag = choice.Id,
             }).ToArray();
-            foreach (var option in new[] { wallpaper, icons, taskbar, fullscreen, fse })
-                fields.Children.Add(option);
             fields.Children.Add(Row("壁纸 / 窗口目标屏幕", monitors));
+        }
+        if (capabilities.Features.HasFlag(DesktopFeatures.WindowProcesses))
+        {
             fields.Children.Add(new TextBlock { Text = "额外位移的应用进程" });
             fields.Children.Add(processes);
         }
@@ -94,11 +97,11 @@ internal sealed class SettingsWindow : Window
         var body = new StackPanel { Margin = new Thickness(24), Spacing = 12 };
         foreach (var item in new Control[] { heading, platform, statusPanel, fields, actions, feedback })
             body.Children.Add(item);
-        if (!windows)
+        if (!string.IsNullOrEmpty(capabilities.Description))
         {
             body.Children.Add(new TextBlock
             {
-                Text = "支持 GNOME Wayland 单屏整数缩放。位移由 GNOME 扩展在后台执行。",
+                Text = capabilities.Description,
                 Opacity = 0.72,
                 TextWrapping = TextWrapping.Wrap,
             });
@@ -112,11 +115,19 @@ internal sealed class SettingsWindow : Window
             enabled.IsChecked = false;
         }, null);
         shift.Click += async (_, _) => await Run(shiftOnce, null);
+        foreach (var field in new[] { enabled, startup, wallpaper, icons, taskbar, fullscreen, fse })
+            field.IsCheckedChanged += (_, _) => Dirty();
+        interval.ValueChanged += (_, _) => Dirty();
+        radius.ValueChanged += (_, _) => Dirty();
+        processes.TextChanged += (_, _) => Dirty();
+        monitors.SelectionChanged += (_, _) => Dirty();
         SetAvailable(false);
     }
+    private void Dirty() { if (!loading) IsDirty = true; }
 
     public void LoadSettings(DesktopSettings settings)
     {
+        loading = true;
         interval.Value = settings.IntervalSeconds;
         radius.Value = settings.Radius;
         enabled.IsChecked = settings.Enabled;
@@ -127,11 +138,13 @@ internal sealed class SettingsWindow : Window
         fullscreen.IsChecked = settings.PauseFullscreen;
         fse.IsChecked = settings.FseWindows;
         processes.Text = settings.WindowProcesses;
-        if (windows)
+        if (capabilities.Features.HasFlag(DesktopFeatures.MonitorSelection) && monitors.Items.Count > 0)
         {
             monitors.SelectedItem = monitors.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(item => Equals(item.Tag, settings.Monitor)) ?? monitors.Items[0];
         }
+        loading = false;
+        IsDirty = false;
     }
 
     public void SetStatus(string value) => status.Text = value;

@@ -6,6 +6,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Core/ShiftPolicy.cs" Link="ShiftPolicy.cs" />
+    <ProjectReference Include="../../Core/OpenOLEDShifter.Core.csproj" />
   </ItemGroup>
 </Project>

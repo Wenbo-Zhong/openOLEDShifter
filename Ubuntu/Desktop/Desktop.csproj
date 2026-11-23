@@ -8,9 +8,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Desktop/*.cs" Link="Desktop/%(Filename)%(Extension)" />
-    <Compile Include="../../Core/ShiftPolicy.cs" Link="Core/ShiftPolicy.cs" />
+    <ProjectReference Include="../../Desktop/OpenOLEDShifter.Desktop.csproj" />
     <None Update="bridge.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Import Project="../../Desktop/Avalonia.props" />
 </Project>

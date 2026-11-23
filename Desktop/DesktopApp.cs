@@ -10,9 +10,9 @@ using Avalonia.Threading;
 
 namespace OpenOLEDShifter;
 
-internal sealed class DesktopApp(Action<IClassicDesktopStyleApplicationLifetime> initialize) : Application
+public sealed class DesktopApp(Action<IClassicDesktopStyleApplicationLifetime> initialize) : Application
 {
-    public static readonly Uri IconUri = new("avares://OpenOLEDShifter/Assets/app-icon.png");
+    public static readonly Uri IconUri = new("avares://OpenOLEDShifter.Desktop/Assets/app-icon.png");
 
     public static int Run(string[] args, Action<IClassicDesktopStyleApplicationLifetime> initialize) =>
         AppBuilder.Configure(() => new DesktopApp(initialize)).UsePlatformDetect()
