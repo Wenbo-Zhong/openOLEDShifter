@@ -25,7 +25,7 @@ internal sealed class TrayApp : IDisposable, IDesktopBackend
     private readonly bool smoke;
     private string status = "正在启动";
 
-    public TrayApp(IClassicDesktopStyleApplicationLifetime desktop, bool smokeTest)
+    public TrayApp(IClassicDesktopStyleApplicationLifetime desktop, bool smokeTest, bool background, EventWaitHandle showSettings)
     {
         this.desktop = desktop;
         smoke = smokeTest;
@@ -46,10 +46,18 @@ internal sealed class TrayApp : IDisposable, IDesktopBackend
             Icon = new WindowIcon(icon), ToolTipText = "OpenOLEDShifter", IsVisible = true, Menu = menu,
         };
         tray.Clicked += (_, _) => ShowSettings();
-        timer.Tick += (_, _) => Tick();
+        TrayIcon.SetIcons(Avalonia.Application.Current!, new TrayIcons { tray });
+        timer.Tick += (_, _) =>
+        {
+            if (showSettings.WaitOne(0))
+                ShowSettings();
+            Tick();
+        };
         desktop.Exit += (_, _) => Dispose();
         if (smoke)
         {
+            if (tray.NativeMenuExporter is null)
+                throw new InvalidOperationException("Windows tray icon was not initialized.");
             ShowSettings();
             DesktopApp.SmokeTest(settingsSession!.Window, desktop);
             return;
@@ -74,7 +82,7 @@ internal sealed class TrayApp : IDisposable, IDesktopBackend
         SystemEvents.SessionEnding += SessionEnding;
         schedule.Reset(prefs.IntervalSeconds, DateTimeOffset.UtcNow);
         timer.Start(); Tick();
-        if (Native.VendorRunning()) ShowSettings();
+        if (!background || Native.VendorRunning()) ShowSettings();
     }
     private string Reason()
     {
@@ -237,7 +245,7 @@ internal static class Startup
         set
         {
             using var k = Registry.CurrentUser.CreateSubKey(Key);
-            if (value) k.SetValue("OpenOLEDShifter", "\"" + Environment.ProcessPath + "\"");
+            if (value) k.SetValue("OpenOLEDShifter", "\"" + Environment.ProcessPath + "\" --background");
             else k.DeleteValue("OpenOLEDShifter", false);
         }
     }

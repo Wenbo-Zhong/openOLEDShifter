@@ -19,10 +19,14 @@ internal static class Program
             return;
         }
 
-        using var mutex = new Mutex(true, @"Local\OpenOLEDShifter-" + Environment.UserName, out bool first);
+        bool smoke = args.Contains("--smoke-test");
+        string instance = smoke ? Guid.NewGuid().ToString("N") : Environment.UserName;
+        using var mutex = new Mutex(true, @"Local\OpenOLEDShifter-" + instance, out bool first);
+        using var showSettings = new EventWaitHandle(false, EventResetMode.AutoReset,
+            @"Local\OpenOLEDShifter-Settings-" + instance);
         if (!first)
         {
-            Native.ShowMessage("OpenOLEDShifter 已在托盘运行。");
+            showSettings.Set();
             return;
         }
 
@@ -33,7 +37,8 @@ internal static class Program
         try
         {
             Environment.ExitCode = DesktopApp.Run(args, desktop =>
-                context = new TrayApp(desktop, args.Contains("--smoke-test")));
+                context = new TrayApp(desktop, smoke,
+                    args.Contains("--background"), showSettings));
         }
         catch (Exception error)
         {
