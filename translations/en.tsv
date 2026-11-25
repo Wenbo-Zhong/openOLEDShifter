@@ -1,5 +1,5 @@
 "Enable timed shifts"	"Enable timed shifts"
-"Start shifting at login"	"Start shifting at login"
+"Start shifting at login"	"Start shifting at login and show a tray icon"
 "Interval (seconds)"	"Interval (seconds)"
 "Maximum shift (physical pixels)"	"Maximum shift (physical pixels)"
 "Shift static wallpaper"	"Shift static wallpaper"
@@ -74,3 +74,4 @@
 "The wallpaper extension is enabled but not responding. Sign out and back in to load the installed version."	"The wallpaper extension is enabled but not responding. Sign out and back in to load the installed version."
 "The wallpaper extension is disabled. Run this command as your desktop user."	"The wallpaper extension is disabled. Run this command as your desktop user."
 "Select Enable timed shifts and click Save to start."	"Select Enable timed shifts and click Save to start."
+"Could not update OpenOLEDShifter login startup."	"Could not update OpenOLEDShifter login startup."

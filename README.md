@@ -41,11 +41,11 @@ sudo apt install ./release/ubuntu/openoledshifter_0.1.0_amd64.deb
 gnome-extensions enable openoledshifter@openoledshifter
 ```
 
-从应用面板或 OpenOLEDShifter 托盘菜单打开设置，勾选 **启用定时位移** 并保存。Ubuntu 已提供 AppIndicator 托盘支持。关闭设置窗口会收起到系统托盘，托盘菜单可重新打开设置或退出。启用 OpenOLEDShifter 扩展后，托盘也可控制暂停、继续和立即位移。登录自动开始默认为关闭。
+从应用面板或 OpenOLEDShifter 托盘菜单打开设置，勾选 **启用定时位移** 并保存。Ubuntu 已提供 AppIndicator 托盘支持。关闭设置窗口会收起到系统托盘，托盘菜单可重新打开设置或退出。启用 OpenOLEDShifter 扩展后，托盘也可控制暂停、继续和立即位移。登录自动开始默认为关闭。勾选「登录时启动位移和托盘」并保存后，应用会在下次登录时在托盘启动，扩展会开始定时位移。从旧版升级时，已勾选过这一项的用户需要重新保存一次以登记托盘启动。
 
 Ubuntu 版支持 GNOME 50 Wayland 多屏本地静态壁纸位移，支持整数、125% 或 150% 缩放。锁屏、休眠和活动概览期间暂停。全屏暂停默认开启，可在设置中关闭。桌面图标、Dock、应用窗口和其他分数缩放档暂不支持。
 
-卸载前先以桌面用户身份停用扩展以恢复原位，再移除软件包：
+卸载前，在设置里关闭「登录时启动位移和托盘」并保存，再停用扩展以恢复原位并移除软件包：
 
 ```bash
 gnome-extensions disable openoledshifter@openoledshifter

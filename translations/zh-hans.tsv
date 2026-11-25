@@ -1,5 +1,5 @@
 "Enable timed shifts"	"启用定时位移"
-"Start shifting at login"	"登录时启动"
+"Start shifting at login"	"登录时启动位移和托盘"
 "Interval (seconds)"	"位移间隔（秒）"
 "Maximum shift (physical pixels)"	"最大偏移（物理像素）"
 "Shift static wallpaper"	"位移静态壁纸"
@@ -74,3 +74,4 @@
 "The wallpaper extension is enabled but not responding. Sign out and back in to load the installed version."	"壁纸位移扩展已启用，但暂未响应。请注销并重新登录，以加载已安装的版本。"
 "The wallpaper extension is disabled. Run this command as your desktop user."	"壁纸位移扩展尚未启用。请以当前桌面用户身份运行以下命令。"
 "Select Enable timed shifts and click Save to start."	"勾选「启用定时位移」，点击「保存」即可开始。"
+"Could not update OpenOLEDShifter login startup."	"无法更新 OpenOLEDShifter 的登录启动设置。"

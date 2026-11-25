@@ -67,7 +67,7 @@ if(OPENOLED_BUILD_UI)
     find_package(wxWidgets REQUIRED COMPONENTS core base)
     include(${wxWidgets_USE_FILE})
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GNOME REQUIRED IMPORTED_TARGET gio-2.0 json-glib-1.0 gtk+-3.0 ayatana-appindicator3-0.1)
+    pkg_check_modules(GNOME REQUIRED IMPORTED_TARGET gio-2.0 gio-unix-2.0 json-glib-1.0 gtk+-3.0 ayatana-appindicator3-0.1)
     find_package(Threads REQUIRED)
     add_executable(OpenOLEDShifter settings.cpp ui_text.cpp gnome_main.cpp gnome_backend.cpp)
     target_link_libraries(OpenOLEDShifter PRIVATE shift_core ${wxWidgets_LIBRARIES}

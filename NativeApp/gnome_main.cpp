@@ -10,12 +10,16 @@
 
 class SettingsApp final : public wxApp {
     bool OnInit() override {
+        bool background = false;
+        for (int i = 1; i < argc; ++i)
+            background = background || argv[i] == "--background";
         SetAppName("OpenOLEDShifter");
         application_ = g_application_new("org.openoledshifter.Desktop", G_APPLICATION_DEFAULT_FLAGS);
         if (!g_application_register(application_, nullptr, nullptr)) {
             g_clear_object(&application_);
         } else if (g_application_get_is_remote(application_)) {
-            g_application_activate(application_);
+            if (!background)
+                g_application_activate(application_);
             g_clear_object(&application_);
             return false;
         }
@@ -61,7 +65,8 @@ class SettingsApp final : public wxApp {
             g_action_map_add_action(G_ACTION_MAP(application_), G_ACTION(quit));
             g_object_unref(quit);
         }
-        frame->Show();
+        if (!background || !application_)
+            frame->Show();
         return true;
     }
 

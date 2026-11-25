@@ -110,7 +110,7 @@ public:
         SetSizer(outer);
         const auto work = wxDisplay(0u).GetClientArea().GetSize();
 #ifdef __WXGTK__
-        const auto preferred = FromDIP(wxSize(640, 680));
+        const auto preferred = FromDIP(wxSize(640, 580));
 #else
         const auto preferred = FromDIP(wxSize(has_targets_ ? 740 : 515, 320));
 #endif
@@ -291,6 +291,18 @@ private:
                 status_text_ += "\n" + ui_status(error.what());
         }
         wrap_labels();
+#ifdef __WXGTK__
+        if (!initial_status_fitted_) {
+            initial_status_fitted_ = true;
+            const auto display = wxDisplay::GetFromWindow(this);
+            const auto work = wxDisplay(display == wxNOT_FOUND ? 0u : static_cast<unsigned>(display))
+                .GetClientArea();
+            const int missing = panel_->GetSizer()->GetMinSize().y + FromDIP(8) - panel_->GetClientSize().y;
+            const auto size = GetSize();
+            if (missing > 0 && size.y < work.height)
+                SetSize(size.x, std::min(work.height, size.y + missing));
+        }
+#endif
         next_read_ = Schedule::Clock::now() + std::chrono::seconds(3);
         controls();
         if (close_after_) {
@@ -351,6 +363,9 @@ private:
     bool close_after_ = false;
     Schedule::Clock::time_point next_read_;
     Command command_ = Command::Read;
+#ifdef __WXGTK__
+    bool initial_status_fitted_ = false;
+#endif
     bool connected_ = false;
     bool dirty_ = false;
 };

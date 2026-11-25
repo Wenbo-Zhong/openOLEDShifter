@@ -3,6 +3,9 @@
 #include "settings_backend.hpp"
 
 #include <gio/gio.h>
+#include <gio/gdesktopappinfo.h>
+#include <glib/gstdio.h>
+#include <cerrno>
 #include <json-glib/json-glib.h>
 #include <memory>
 
@@ -63,6 +66,43 @@ bool extension_installed() {
     throw std::runtime_error(
         "The wallpaper extension is disabled. Run this command as your desktop user.\n"
         "gnome-extensions enable openoledshifter@openoledshifter");
+}
+
+void save_autostart(bool enabled) {
+    constexpr char id[] = "org.openoledshifter.Desktop.desktop";
+    constexpr char marker[] = "X-OpenOLEDShifter-Managed";
+    std::unique_ptr<char, decltype(&g_free)> directory(
+        g_build_filename(g_get_user_config_dir(), "autostart", nullptr), g_free);
+    std::unique_ptr<char, decltype(&g_free)> path(g_build_filename(directory.get(), id, nullptr), g_free);
+    constexpr char failure[] = "Could not update OpenOLEDShifter login startup.";
+    std::unique_ptr<GKeyFile, decltype(&g_key_file_unref)> entry(g_key_file_new(), g_key_file_unref);
+    const bool exists = g_file_test(path.get(), G_FILE_TEST_EXISTS);
+    if (g_file_test(path.get(), G_FILE_TEST_IS_SYMLINK) ||
+        (exists && (!g_key_file_load_from_file(entry.get(), path.get(), G_KEY_FILE_NONE, nullptr) ||
+                    !g_key_file_get_boolean(entry.get(), G_KEY_FILE_DESKTOP_GROUP, marker, nullptr))))
+        throw std::runtime_error(failure);
+    if (!enabled) {
+        if (exists && g_unlink(path.get()) != 0 && errno != ENOENT)
+            throw std::runtime_error(failure);
+        return;
+    }
+
+    std::unique_ptr<GDesktopAppInfo, decltype(&g_object_unref)> app(g_desktop_app_info_new(id), g_object_unref);
+    std::unique_ptr<char, decltype(&g_free)> exec(app ? g_desktop_app_info_get_string(app.get(), "Exec") : nullptr, g_free);
+    if (!exec || g_mkdir_with_parents(directory.get(), 0700) != 0)
+        throw std::runtime_error(failure);
+    const auto group = G_KEY_FILE_DESKTOP_GROUP;
+    g_key_file_set_string(entry.get(), group, "Type", "Application");
+    g_key_file_set_string(entry.get(), group, "Name", "OpenOLEDShifter");
+    g_key_file_set_string(entry.get(), group, "Exec", (std::string(exec.get()) + " --background").c_str());
+    g_key_file_set_string(entry.get(), group, "OnlyShowIn", "GNOME;");
+    g_key_file_set_string(entry.get(), group, "TryExec", g_app_info_get_executable(G_APP_INFO(app.get())));
+    g_key_file_set_boolean(entry.get(), group, marker, TRUE);
+    gsize size = 0;
+    std::unique_ptr<char, decltype(&g_free)> serialized(g_key_file_to_data(entry.get(), &size, nullptr), g_free);
+    if (!g_file_set_contents_full(path.get(), serialized.get(), size,
+                                  G_FILE_SET_CONTENTS_CONSISTENT, 0600, nullptr))
+        throw std::runtime_error(failure);
 }
 
 JsonNode* member(JsonObject* object, const char* key, GType type) {
@@ -135,6 +175,8 @@ class GnomeBackend final : public Backend {
             result.settings.pause_fullscreen = json_node_get_boolean(member(fields, "PauseFullscreen", G_TYPE_BOOLEAN));
         if (result.status == "Wallpaper shifting is off")
             result.status += "\nSelect Enable timed shifts and click Save to start.";
+        if (command == Command::Apply)
+            save_autostart(result.settings.login);
         return result;
     }
 };
