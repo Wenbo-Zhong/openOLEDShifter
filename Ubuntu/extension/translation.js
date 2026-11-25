@@ -36,3 +36,47 @@ export class WallpaperTranslation {
         this.actor = null;
     }
 }
+
+export class WallpaperTranslations {
+    #entries = new Map();
+    #blocked = new WeakSet();
+
+    get empty() {
+        return this.#entries.size === 0;
+    }
+
+    isBlocked(actor) {
+        return this.#blocked.has(actor);
+    }
+
+    matches(targets) {
+        return this.#entries.size === targets.length &&
+            targets.every(({actor, scale}) => this.#entries.get(actor)?.scale === scale);
+    }
+
+    shift(targets, x, y) {
+        if (!this.matches(targets)) {
+            this.release();
+            for (const {actor, scale} of targets)
+                this.#entries.set(actor, {scale, translation: new WallpaperTranslation(actor)});
+        }
+        // Check all actors before changing any output.
+        if (targets.some(({actor}) => this.isBlocked(actor) || !this.#entries.get(actor).translation.owns())) {
+            this.release();
+            return false;
+        }
+
+        for (const {scale, translation} of this.#entries.values())
+            translation.shift(x, y, scale);
+        return true;
+    }
+
+    release() {
+        for (const {translation} of this.#entries.values()) {
+            if (translation.actor && !translation.owns())
+                this.#blocked.add(translation.actor);
+            translation.release();
+        }
+        this.#entries.clear();
+    }
+}

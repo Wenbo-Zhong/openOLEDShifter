@@ -6,6 +6,10 @@
       <default>false</default>
       <summary>Start wallpaper shifting on login</summary>
     </key>
+    <key name="pause-fullscreen" type="b">
+      <default>true</default>
+      <summary>Pause wallpaper shifting during full-screen activity</summary>
+    </key>
     <key name="interval-seconds" type="i">
       <range min="@MIN_INTERVAL@" max="@MAX_INTERVAL@"/>
       <default>@DEFAULT_INTERVAL@</default>

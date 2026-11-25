@@ -15,8 +15,10 @@ Requires:       gjs
 Requires:       wxGTK >= 3.2
 Requires:       gtk3, glib2, json-glib, libstdc++
 
+Requires:       libayatana-appindicator-gtk3
+
 %description
-OpenOLEDShifter shifts a static wallpaper on a single display using a GNOME
+OpenOLEDShifter shifts a static wallpaper on supported displays using a GNOME
 Shell extension. A wxWidgets settings window is available in the app grid.
 
 %install

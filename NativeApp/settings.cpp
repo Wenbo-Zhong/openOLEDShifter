@@ -51,7 +51,7 @@ public:
         fields->Add(radius_, 0, wxEXPAND);
         timing->Add(fields, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(8));
         timing->Add(login_, 0, wxALL, FromDIP(8));
-        add_option(timing_parent, timing, features.application_windows, "Pause for full-screen activity", &Settings::pause_fullscreen);
+        add_option(timing_parent, timing, features.fullscreen_pause, "Pause for full-screen activity", &Settings::pause_fullscreen);
 
         if (features.wallpaper_toggle || features.desktop_icons || features.taskbar_auto_hide ||
             features.wallpaper_monitor_selection) {
@@ -108,7 +108,11 @@ public:
         outer->Add(panel, 1, wxEXPAND);
         SetSizer(outer);
         const auto work = wxDisplay(0u).GetClientArea().GetSize();
+#ifdef __WXGTK__
+        const auto preferred = FromDIP(wxSize(640, 680));
+#else
         const auto preferred = FromDIP(wxSize(has_targets_ ? 740 : 515, 320));
+#endif
         SetSize(wxSize(std::min(preferred.x, work.x), std::min(preferred.y, work.y)));
         SetMinSize(wxSize(std::min(FromDIP(410), work.x), std::min(FromDIP(240), work.y)));
         panel_->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
@@ -141,7 +145,12 @@ public:
         Layout();
         wrap_labels();
         const int frame_height = GetSize().y - GetClientSize().y;
-        SetSize(GetSize().x, std::min(work.y, layout->GetMinSize().y + frame_height + FromDIP(4)));
+        const auto content_height = layout->GetMinSize().y + frame_height + FromDIP(4);
+#ifdef __WXGTK__
+        SetSize(GetSize().x, std::min(work.y, std::max(preferred.y, content_height)));
+#else
+        SetSize(GetSize().x, std::min(work.y, content_height));
+#endif
         timer_.Start(100);
         begin(Command::Read);
     }
@@ -259,7 +268,9 @@ private:
             status_text_ = ui_status(state.status);
         } catch (const std::exception& error) {
             connected_ = false;
-            status_text_ = ui_text(desktop_backend().failure_hint()) + "\n" + wxString::FromUTF8(error.what());
+            status_text_ = ui_text(desktop_backend().failure_hint());
+            if (*error.what())
+                status_text_ += "\n" + ui_status(error.what());
         }
         wrap_labels();
         next_read_ = Schedule::Clock::now() + std::chrono::seconds(3);

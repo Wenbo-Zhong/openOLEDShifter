@@ -154,7 +154,7 @@ public:
                "Desktop icons and the taskbar apply system-wide.";
     }
     const char* failure_hint() const override { return "Windows settings operation failed."; }
-    DesktopFeatures features() const override { return {true, true, true, true, true, true}; }
+    DesktopFeatures features() const override { return {true, true, true, true, true, true, true}; }
     bool use_worker() const override { return false; }
 
     void initialize(bool smoke) {

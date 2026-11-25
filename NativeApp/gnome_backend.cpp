@@ -10,7 +10,59 @@ namespace oled {
 namespace {
 [[noreturn]] void fail(GError* error) {
     std::unique_ptr<GError, decltype(&g_error_free)> owned(error, g_error_free);
-    throw std::runtime_error(error ? error->message : "No response from GNOME Shell");
+    if (error)
+        g_debug("OpenOLEDShifter GNOME backend: %s", error->message);
+    throw std::runtime_error("");
+}
+
+constexpr char extension_id[] = "openoledshifter@openoledshifter";
+
+bool extension_installed() {
+    const auto installed_in = [](const char* directory) {
+        std::unique_ptr<char, decltype(&g_free)> metadata(
+            g_build_filename(directory, "gnome-shell", "extensions", extension_id, "metadata.json", nullptr), g_free);
+        return g_file_test(metadata.get(), G_FILE_TEST_IS_REGULAR);
+    };
+    if (installed_in(g_get_user_data_dir()))
+        return true;
+    for (auto directories = g_get_system_data_dirs(); *directories; ++directories)
+        if (installed_in(*directories))
+            return true;
+    return false;
+}
+
+[[noreturn]] void explain_unavailable(GDBusConnection* connection, GError* error) {
+    std::unique_ptr<GError, decltype(&g_error_free)> owned(error, g_error_free);
+    if (error)
+        g_debug("OpenOLEDShifter GNOME backend: %s", error->message);
+
+    std::unique_ptr<GVariant, decltype(&g_variant_unref)> info(
+        g_dbus_connection_call_sync(connection, "org.gnome.Shell.Extensions",
+            "/org/gnome/Shell/Extensions", "org.gnome.Shell.Extensions", "GetExtensionInfo",
+            g_variant_new("(s)", extension_id), G_VARIANT_TYPE("(a{sv})"),
+            G_DBUS_CALL_FLAGS_NONE, 1000, nullptr, nullptr), g_variant_unref);
+    if (!info)
+        throw std::runtime_error("GNOME Shell is unavailable. Open the app from an Ubuntu GNOME Wayland session.");
+
+    std::unique_ptr<GVariant, decltype(&g_variant_unref)> fields(g_variant_get_child_value(info.get(), 0),
+        g_variant_unref);
+    if (g_variant_n_children(fields.get()) == 0) {
+        if (!extension_installed())
+            throw std::runtime_error("Wallpaper extension files are missing. Reinstall the OpenOLEDShifter package.");
+        throw std::runtime_error(
+            "The wallpaper extension is installed but not loaded in this session. Save your work, sign out, and sign back in.\n"
+            "Then run this command as your desktop user and reopen OpenOLEDShifter.\n"
+            "gnome-extensions enable openoledshifter@openoledshifter");
+    }
+
+    gboolean enabled = FALSE;
+    if (g_variant_lookup(fields.get(), "enabled", "b", &enabled) && enabled)
+        throw std::runtime_error(
+            "The wallpaper extension is enabled but not responding. Sign out and back in to load the installed version.");
+
+    throw std::runtime_error(
+        "The wallpaper extension is disabled. Run this command as your desktop user.\n"
+        "gnome-extensions enable openoledshifter@openoledshifter");
 }
 
 JsonNode* member(JsonObject* object, const char* key, GType type) {
@@ -22,12 +74,14 @@ JsonNode* member(JsonObject* object, const char* key, GType type) {
 
 class GnomeBackend final : public Backend {
     const char* description() const override {
-        return "GNOME Wayland: one display with integer scaling and a static wallpaper.";
+        return "GNOME Wayland: static wallpapers on displays with integer, 125%, or 150% scaling.";
     }
 
     const char* failure_hint() const override {
-        return "Enable the OpenOLEDShifter GNOME extension.";
+        return "Wallpaper shifting is unavailable. The tray still works.";
     }
+
+    DesktopFeatures features() const override { return {.fullscreen_pause = true}; }
 
     State call(Command command, const Settings& settings) override {
         GError* error = nullptr;
@@ -43,9 +97,9 @@ class GnomeBackend final : public Backend {
         case Command::Pause: method = "Pause"; break;
         case Command::Shift: method = "Shift"; break;
         case Command::Apply:
-            method = "Apply";
-            parameters = g_variant_new("(iibb)", settings.interval, settings.radius,
-                                       settings.enabled, settings.login);
+            method = "ApplyOptions";
+            parameters = g_variant_new("(iibbb)", settings.interval, settings.radius,
+                                       settings.enabled, settings.login, settings.pause_fullscreen);
             break;
         }
         std::unique_ptr<GVariant, decltype(&g_variant_unref)> reply(
@@ -54,7 +108,7 @@ class GnomeBackend final : public Backend {
                 parameters, G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START,
                 2000, nullptr, &error), g_variant_unref);
         if (!reply)
-            fail(error);
+            explain_unavailable(connection.get(), error);
         const char* json = nullptr;
         g_variant_get(reply.get(), "(&s)", &json);
         std::unique_ptr<JsonParser, decltype(&g_object_unref)> parser(json_parser_new(), g_object_unref);
@@ -72,10 +126,15 @@ class GnomeBackend final : public Backend {
         const auto radius = json_node_get_int(member(fields, "Radius", G_TYPE_INT64));
         if (interval < min_interval || interval > max_interval || radius < min_radius || radius > max_radius)
             throw std::runtime_error("GNOME extension returned out-of-range settings");
-        return {{static_cast<int>(interval), static_cast<int>(radius),
+        State result{{static_cast<int>(interval), static_cast<int>(radius),
                  json_node_get_boolean(member(fields, "Enabled", G_TYPE_BOOLEAN)) != 0,
                  json_node_get_boolean(member(fields, "StartAtLogin", G_TYPE_BOOLEAN)) != 0},
                 json_node_get_string(member(object, "Status", G_TYPE_STRING)), {}};
+        if (json_object_has_member(fields, "PauseFullscreen"))
+            result.settings.pause_fullscreen = json_node_get_boolean(member(fields, "PauseFullscreen", G_TYPE_BOOLEAN));
+        if (result.status == "Wallpaper shifting is off")
+            result.status += "\nSelect Enable timed shifts and click Save to start.";
+        return result;
     }
 };
 }

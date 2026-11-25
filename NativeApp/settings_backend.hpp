@@ -26,6 +26,7 @@ struct DesktopFeatures {
     bool wallpaper_monitor_selection = false;
     bool application_windows = false;
     bool immediate_startup = false;
+    bool fullscreen_pause = false;
 };
 
 struct DisplayChoice {

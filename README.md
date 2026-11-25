@@ -2,11 +2,11 @@
 
 适用于 Windows 和 Ubuntu 的 OLED 像素位移工具，针对 ASUS ProArt P16 的 AsusOLEDShifter 1.0.21.0 做静态分析后独立实现。无需华硕软件、管理员权限或内核驱动。
 
-**Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持单屏、整数缩放。两端默认使用 200 秒间隔和九点往返轨迹。
+**Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持多屏及整数、125% 和 150% 缩放。两端默认使用 200 秒间隔和九点往返轨迹。
 
 Ubuntu 打包入口和 Windows 原生预览均使用 **C++ + wxWidgets**。Windows 正式发布仍由 Avalonia 和 .NET 8 提供完整桌面功能。[架构与迁移状态](docs/ARCHITECTURE.md)
 
-原生界面跟随系统语言和浅色／深色偏好。简体中文、繁体中文和英文可自动识别，其他语言使用英文。设置窗口支持高 DPI 和滚动布局。GNOME 壁纸位移仍要求整数缩放。
+原生界面跟随系统语言和浅色／深色偏好。简体中文、繁体中文和英文可自动识别，其他语言使用英文。设置窗口支持高 DPI 和滚动布局。
 
 翻译文案按语言保存在 [translations](translations/README.md)。新增语言只需提交对应的翻译文件。
 
@@ -27,7 +27,7 @@ DEB 面向 Ubuntu 26.04。RPM 面向使用 GNOME 50 Wayland 的 Fedora 44，可�
 用 `./build-ubuntu.sh` 构建。在 Ubuntu x64 上生成 `release/ubuntu/openoledshifter_0.1.0_amd64.deb`。构建前安装工具和头文件：
 
 ```sh
-sudo apt install cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils
+sudo apt install cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-dev libjson-glib-dev libayatana-appindicator3-dev gjs libglib2.0-bin desktop-file-utils
 ./build-ubuntu.sh
 ```
 
@@ -41,9 +41,9 @@ sudo apt install ./release/ubuntu/openoledshifter_0.1.0_amd64.deb
 gnome-extensions enable openoledshifter@openoledshifter
 ```
 
-从应用面板或 GNOME 顶栏的 **Settings** 打开设置，勾选 **启用定时位移** 并保存。设置应用包含运行时，窗口通过 XWayland 显示。关闭窗口后，GNOME 扩展继续执行位移。登录自动开始默认为关闭。
+从应用面板或 OpenOLEDShifter 托盘菜单打开设置，勾选 **启用定时位移** 并保存。Ubuntu 已提供 AppIndicator 托盘支持。关闭设置窗口会收起到系统托盘，托盘菜单可重新打开设置或退出。启用 OpenOLEDShifter 扩展后，托盘也可控制暂停、继续和立即位移。登录自动开始默认为关闭。
 
-Ubuntu 版支持 GNOME 50 Wayland 单屏、整数缩放下的本地静态壁纸位移。锁屏、休眠、全屏和活动概览期间暂停。桌面图标、Dock、应用窗口、分数缩放和多屏暂不支持。
+Ubuntu 版支持 GNOME 50 Wayland 多屏本地静态壁纸位移，支持整数、125% 或 150% 缩放。锁屏、休眠和活动概览期间暂停。全屏暂停默认开启，可在设置中关闭。桌面图标、Dock、应用窗口和其他分数缩放档暂不支持。
 
 卸载前先以桌面用户身份停用扩展以恢复原位，再移除软件包：
 
