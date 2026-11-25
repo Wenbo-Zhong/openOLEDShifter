@@ -1,6 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# Keep the self-contained .NET payload intact.
-%global __os_install_post %{nil}
 %global _build_id_links none
 %global debug_package %{nil}
 
@@ -14,13 +12,12 @@ AutoReqProv:    no
 Requires:       gnome-shell >= 50
 Requires:       gnome-shell < 51
 Requires:       gjs
-Requires:       xorg-x11-server-Xwayland
-Requires:       libX11, libICE, libSM, fontconfig, libglvnd-glx
-Requires:       glibc, libgcc, libstdc++, zlib, libicu, openssl-libs
+Requires:       wxGTK >= 3.2
+Requires:       glib2, json-glib, libstdc++
 
 %description
 OpenOLEDShifter shifts a static wallpaper on a single display using a GNOME
-Shell extension. An Avalonia settings window is available in the app grid.
+Shell extension. A wxWidgets settings window is available in the app grid.
 
 %install
 mkdir -p "%{buildroot}"

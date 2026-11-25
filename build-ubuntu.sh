@@ -18,8 +18,8 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 arch=$(dpkg --print-architecture)
 case "$arch" in
-    amd64) rid=linux-x64; rpm_arch=x86_64 ;;
-    arm64) rid=linux-arm64; rpm_arch=aarch64 ;;
+    amd64) rpm_arch=x86_64 ;;
+    arm64) rpm_arch=aarch64 ;;
     *) printf 'Unsupported Ubuntu architecture: %s\n' "$arch" >&2; exit 1 ;;
 esac
 
@@ -41,14 +41,18 @@ install -Dm0644 assets/app-icon.png "$stage/usr/share/icons/hicolor/512x512/apps
 install -Dm0644 LICENSE "$stage/usr/share/doc/$name/copyright"
 
 schema=org.gnome.shell.extensions.openoledshifter.gschema.xml
-dotnet run --project Ubuntu/Build -c Release -- \
+cmake -S NativeApp -B "$stage/native-build" -DCMAKE_BUILD_TYPE=Release -DOPENOLED_BUILD_UI=ON
+cmake --build "$stage/native-build" --parallel
+ctest --test-dir "$stage/native-build" --output-on-failure
+"$stage/native-build/generate_policy" \
     "Ubuntu/extension/schemas/$schema.in" "$extension/schemas/$schema" "$extension/cycles.js"
 glib-compile-schemas --strict "$extension/schemas"
 gjs -m "$extension/cycles.js"
 gjs -m Ubuntu/translation-test.js
 desktop-file-validate "$stage/usr/share/applications/$desktop_id.desktop"
 
-dotnet publish Ubuntu/Desktop -c Release -r "$rid" --self-contained true -o "$app" --nologo
+install -Dm0755 "$stage/native-build/OpenOLEDShifter" "$app/OpenOLEDShifter"
+rm -rf -- "$stage/native-build"
 
 build_deb() {
     install -d "$stage/DEBIAN"
@@ -60,11 +64,11 @@ Section: utils
 Priority: optional
 Maintainer: OpenOLEDShifter contributors <108850792+Wenbo-Zhong@users.noreply.github.com>
 Installed-Size: $(du -sk "$stage/usr" | cut -f1)
-Depends: gnome-shell (>= 50~), gnome-shell (<< 51~), gjs, xwayland, libx11-6, libice6, libsm6, libfontconfig1, libgl1, libicu78, libssl3t64, libgcc-s1, libstdc++6, zlib1g
+Depends: gnome-shell (>= 50~), gnome-shell (<< 51~), gjs, libwxgtk3.2-1t64, libglib2.0-0t64, libjson-glib-1.0-0, libstdc++6
 Homepage: https://github.com/Wenbo-Zhong/openOLEDShifter
 Description: OLED wallpaper pixel shifting for GNOME Wayland
  OpenOLEDShifter shifts a static wallpaper on a single display using a GNOME
- Shell extension. An Avalonia settings window is available in the app grid.
+ Shell extension. A wxWidgets settings window is available in the app grid.
 CONTROL
 
     local artifact="$output/${name}_${version}_${arch}.deb"

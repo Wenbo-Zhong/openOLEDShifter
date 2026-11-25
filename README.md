@@ -2,9 +2,9 @@
 
 适用于 Windows 和 Ubuntu 的 OLED 像素位移工具，针对 ASUS ProArt P16 的 AsusOLEDShifter 1.0.21.0 做静态分析后独立实现。无需华硕软件、管理员权限或内核驱动。
 
-**Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持单屏、整数缩放。两端共享 Avalonia 设置窗口、默认参数和九点往返轨迹。
+**Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持单屏、整数缩放。两端默认使用 200 秒间隔和九点往返轨迹。
 
-框架已统一为 **Avalonia + .NET 8**：设置、后台命令接口、连接控制及核心逻辑各维护一份，Windows 的 Win32/COM 和 Ubuntu 的 GNOME/D-Bus 操作分别放在平台后端。[共享架构说明](docs/ARCHITECTURE.md)
+Ubuntu 打包入口和 Windows 原生预览均使用 **C++ + wxWidgets**。Windows 正式发布仍由 Avalonia 和 .NET 8 提供完整桌面功能。[架构与迁移状态](docs/ARCHITECTURE.md)
 
 ![OpenOLEDShifter icon](assets/app-icon.png)
 
@@ -20,7 +20,12 @@ DEB 面向 Ubuntu 26.04。RPM 面向使用 GNOME 50 Wayland 的 Fedora 44，可�
 
 ## Ubuntu 安装与使用
 
-用 `./build-ubuntu.sh` 构建。在 Ubuntu x64 上生成 `release/ubuntu/openoledshifter_0.1.0_amd64.deb`。构建需要 .NET 8 SDK、GJS、`glib-compile-schemas`、`desktop-file-validate` 和 `dpkg-deb`。
+用 `./build-ubuntu.sh` 构建。在 Ubuntu x64 上生成 `release/ubuntu/openoledshifter_0.1.0_amd64.deb`。构建前安装工具和头文件：
+
+```sh
+sudo apt install cmake g++ pkg-config libwxgtk3.2-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils
+./build-ubuntu.sh
+```
 
 ```bash
 sudo apt install ./release/ubuntu/openoledshifter_0.1.0_amd64.deb
@@ -47,7 +52,9 @@ sudo apt remove openoledshifter
 
 ## Windows 使用
 
-运行 `release\OpenOLEDShifter.exe`，通过托盘图标打开设置。关闭设置窗口后仍在托盘运行，右键选择“退出并恢复”结束。
+从 GitHub Actions 下载 **OpenOLEDShifter-win-x64** 并双击解压出的 `OpenOLEDShifter.exe` 打开设置。EXE 可单独移动，运行时已内置，无需另外安装 .NET。也可以通过托盘图标打开设置。关闭设置窗口后仍在托盘运行，右键选择“退出并恢复”结束。
+
+原生预览由 **OpenOLEDShifter-native-win-x64** 构建产物提供。它使用静态链接的 wxWidgets，EXE 不含 .NET。新旧版本共用单实例锁。试用前请从旧版托盘选择退出并恢复，再打开预览版。预览版首次使用需手动启用位移并保存设置。
 
 检测到 `AsusOLEDShifter.exe` 时会自动暂停，避免两套工具叠加。在 MyASUS 中关闭原版像素位移后，可通过本工具启用；本工具不会停止或禁用任何华硕服务。如果原版后台仍存在，会继续保持暂停。
 
@@ -75,13 +82,13 @@ sudo apt remove openoledshifter
 
 ## Windows 构建和测试
 
-要求 Windows 10/11 x64、.NET 8 SDK；运行依赖框架的发布包要求 .NET 8 Runtime。无需 WinForms 或 Windows Desktop Runtime。
+本地构建要求 Windows 10/11 x64 和 .NET 8 SDK。发布脚本生成 Windows x64 单文件 EXE。首次启动时，程序会将内置的本机库解包到系统临时目录。现有设置和恢复记录仍存放在用户目录。
 
 ```powershell
 .\build.ps1
 dotnet run --project Tests/CoreTests.csproj -c Release
-.\release\OpenOLEDShifter.exe --self-test
-.\release\OpenOLEDShifter.exe --smoke-test
+.\release\windows-x64\OpenOLEDShifter.exe --self-test
+.\release\windows-x64\OpenOLEDShifter.exe --smoke-test
 ```
 
 `--self-test` 仅移动自身创建的测试窗口、用合成图片测试渲染，不修改用户壁纸、任务栏、桌面图标或华硕设置。结果写入当前目录的 `artifacts\tests.txt`。

@@ -17,18 +17,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        env:
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
-        with:
-          dotnet-version: '8.0.x'
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gjs libglib2.0-bin desktop-file-utils rpm
+          sudo apt-get install -y --no-install-recommends cmake g++ pkg-config libwxgtk3.2-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils rpm
       - name: Build DEB and RPM
         run: |
-          dotnet run --project Tests/CoreTests.csproj -c Release
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             export PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
           fi
