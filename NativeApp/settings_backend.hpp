@@ -41,7 +41,7 @@ struct State {
     std::vector<DisplayChoice> wallpaper_displays;
 };
 
-enum class Command { Read, Apply, Pause, Shift, SetStartup };
+enum class Command { Read, Apply, Pause, Shift, SetStartup, Toggle };
 
 class Backend {
 public:

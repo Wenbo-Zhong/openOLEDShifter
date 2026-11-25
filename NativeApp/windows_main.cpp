@@ -67,18 +67,11 @@ public:
         Bind(wxEVT_MENU, [session](wxCommandEvent&) { PostMessageW(session, wm_activate_settings, 0, 0); }, wxID_OPEN);
         Bind(wxEVT_MENU, [](wxCommandEvent&) {
             wxTheApp->CallAfter([] {
-                auto& backend = oled::desktop_backend();
-                auto settings = backend.call(oled::Command::Read, {}).settings;
-                if (settings.enabled) {
-                    backend.call(oled::Command::Pause, {});
-                } else {
-                    settings.enabled = true;
-                    backend.call(oled::Command::Apply, settings);
-                }
+                oled::send_tray_command(wxTheApp->GetTopWindow(), oled::Command::Toggle);
             });
         }, tray_toggle);
         Bind(wxEVT_MENU, [](wxCommandEvent&) {
-            wxTheApp->CallAfter([] { oled::desktop_backend().call(oled::Command::Shift, {}); });
+            wxTheApp->CallAfter([] { oled::send_tray_command(wxTheApp->GetTopWindow(), oled::Command::Shift); });
         }, tray_shift);
         Bind(wxEVT_MENU, [](wxCommandEvent&) { wxTheApp->ExitMainLoop(); }, wxID_EXIT);
     }

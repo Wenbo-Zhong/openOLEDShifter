@@ -103,38 +103,19 @@ class SettingsApp final : public wxApp {
             }
         }));
         add("Pause / continue", G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
-            static_cast<SettingsApp*>(data)->tray_command("Toggle", false);
+            oled::send_tray_command(static_cast<SettingsApp*>(data)->GetTopWindow(), oled::Command::Toggle);
         }));
         add("Shift once", G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
-            static_cast<SettingsApp*>(data)->tray_command("Shift", false);
+            oled::send_tray_command(static_cast<SettingsApp*>(data)->GetTopWindow(), oled::Command::Shift);
         }));
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
         add("Exit and restore", G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
-            static_cast<SettingsApp*>(data)->tray_command("Pause", true);
+            oled::send_tray_command(static_cast<SettingsApp*>(data)->GetTopWindow(), oled::Command::Pause, true);
         }));
         gtk_widget_show_all(menu);
         app_indicator_set_menu(tray_, GTK_MENU(menu));
         app_indicator_set_secondary_activate_target(tray_, open);
         app_indicator_set_status(tray_, APP_INDICATOR_STATUS_ACTIVE);
-    }
-
-    void tray_command(const char* method, bool close) {
-        auto* connection = application_ ? g_application_get_dbus_connection(application_) : nullptr;
-        if (!connection) {
-            if (close && GetTopWindow())
-                GetTopWindow()->Close(true);
-            return;
-        }
-        g_dbus_connection_call(connection, "org.gnome.Shell",
-            "/org/openoledshifter/Desktop", "org.openoledshifter.Desktop", method, nullptr,
-            G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, 1500, nullptr,
-            close ? +[](GObject* source, GAsyncResult* result, gpointer) {
-                auto* reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, nullptr);
-                if (reply)
-                    g_variant_unref(reply);
-                if (auto* window = wxTheApp->GetTopWindow())
-                    window->Close(true);
-            } : nullptr, nullptr);
     }
 
     bool has_tray() const {

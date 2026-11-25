@@ -2,6 +2,7 @@
 // Copyright (c) 2026 OpenOLEDShifter contributors
 #include "settings_backend.hpp"
 #include "settings_frame.hpp"
+#include <deque>
 #include "ui_text.hpp"
 
 #include <wx/wx.h>
@@ -155,7 +156,20 @@ public:
         begin(Command::Read);
     }
 
+    void send_from_tray(Command command, bool close_after) {
+        tray_commands_.emplace_back(command, close_after);
+        dispatch_tray_command();
+    }
+
 private:
+    void dispatch_tray_command() {
+        if (pending_.valid() || tray_commands_.empty())
+            return;
+        const auto [command, close_after] = tray_commands_.front();
+        tray_commands_.pop_front();
+        begin(command, true, close_after);
+    }
+
     void mark_dirty() {
         if (!dirty_) {
             dirty_ = true;
@@ -189,10 +203,12 @@ private:
             control->Enable(editable);
     }
 
-    void begin(Command command) {
+    void begin(Command command, bool from_tray = false, bool close_after = false) {
         if (pending_.valid())
             return;
         command_ = command;
+        from_tray_ = from_tray;
+        close_after_ = close_after;
         Settings settings{interval_->GetValue(), radius_->GetValue(),
                           enabled_->GetValue(), login_->GetValue()};
         for (const auto& [control, value] : options_)
@@ -213,7 +229,9 @@ private:
     void poll() {
         using namespace std::chrono_literals;
         if (!pending_.valid()) {
-            if (Schedule::Clock::now() >= next_read_)
+            if (!tray_commands_.empty())
+                dispatch_tray_command();
+            else if (Schedule::Clock::now() >= next_read_)
                 begin(Command::Read);
             return;
         }
@@ -252,7 +270,7 @@ private:
             connected_ = true;
             if (immediate_startup_)
                 login_->SetValue(state.settings.login);
-            if (!dirty_ || command_ == Command::Apply || command_ == Command::Pause) {
+            if (!dirty_ || (!from_tray_ && (command_ == Command::Apply || command_ == Command::Pause))) {
                 enabled_->SetValue(state.settings.enabled);
                 login_->SetValue(state.settings.login);
                 interval_->SetValue(state.settings.interval);
@@ -275,6 +293,10 @@ private:
         wrap_labels();
         next_read_ = Schedule::Clock::now() + std::chrono::seconds(3);
         controls();
+        if (close_after_) {
+            tray_commands_.clear();
+            CallAfter([this] { Close(true); });
+        }
     }
 
     void wrap_labels() {
@@ -324,6 +346,9 @@ private:
     std::vector<wxButton*> buttons_;
     std::vector<std::pair<wxCheckBox*, bool Settings::*>> options_;
     std::future<State> pending_;
+    std::deque<std::pair<Command, bool>> tray_commands_;
+    bool from_tray_ = false;
+    bool close_after_ = false;
     Schedule::Clock::time_point next_read_;
     Command command_ = Command::Read;
     bool connected_ = false;
@@ -333,3 +358,8 @@ private:
 }
 
 wxFrame* oled::create_settings_frame() { return new SettingsFrame(); }
+
+void oled::send_tray_command(wxWindow* frame, Command command, bool close_after) {
+    if (auto* settings = dynamic_cast<SettingsFrame*>(frame))
+        settings->send_from_tray(command, close_after);
+}

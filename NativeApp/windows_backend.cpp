@@ -226,6 +226,11 @@ public:
             }
             return state();
         }
+        if (command == Command::Toggle) {
+            auto requested = settings_;
+            requested.enabled = !requested.enabled;
+            return call(requested.enabled ? Command::Apply : Command::Pause, requested);
+        }
         if (command == Command::Apply || command == Command::Pause) {
             try {
                 auto requested = command == Command::Pause ? paused_settings() : settings;

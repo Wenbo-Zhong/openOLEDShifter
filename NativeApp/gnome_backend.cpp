@@ -96,6 +96,7 @@ class GnomeBackend final : public Backend {
         case Command::Read: method = "GetState"; break;
         case Command::Pause: method = "Pause"; break;
         case Command::Shift: method = "Shift"; break;
+        case Command::Toggle: method = "Toggle"; break;
         case Command::Apply:
             method = "ApplyOptions";
             parameters = g_variant_new("(iibbb)", settings.interval, settings.radius,
