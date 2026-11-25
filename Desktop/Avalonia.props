@@ -1,7 +1,0 @@
-<Project>
-  <ItemGroup>
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
-    <AvaloniaResource Include="$(MSBuildThisFileDirectory)../assets/app-icon.png" Link="Assets/app-icon.png" />
-  </ItemGroup>
-</Project>

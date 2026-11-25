@@ -1,9 +1,0 @@
-<Project>
-  <!-- All UIs are built in C#. Avalonia 12's optional XAML analyzers target a
-       newer Roslyn; exclude them consistently, including transitive entry projects. -->
-  <Target Name="RemoveUnusedAvaloniaAnalyzers" BeforeTargets="CoreCompile">
-    <ItemGroup>
-      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.Filename)' == 'Avalonia.Analyzers.CSharp' Or '%(Analyzer.Filename)' == 'Avalonia.Generators'" />
-    </ItemGroup>
-  </Target>
-</Project>

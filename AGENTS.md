@@ -16,18 +16,13 @@ This project is GPL-3.0-only. Keep compatible licensing and the source notices. 
 
 ## Implementation boundaries
 
-- `Core/`: platform-neutral net8.0 library: policy, settings, command contract, scheduling and atomic store.
-- `Desktop/`: shared Avalonia library: UI, capabilities-driven controls, polling and connection management.
-- `Program.cs`: Windows startup and settings file location/defaults.
-- `Native.cs`: Win32 and COM APIs; must remain isolated from Linux code.
-- `Engine.cs`: Windows desktop state changes, recovery and GDI+ rendering.
-- `TrayApp.cs`: Windows backend, Avalonia tray lifecycle and Windows session events.
-- `WindowsDisplay.cs` / `NativeFixture.cs`: Win32 monitor discovery and isolated test window; no WinForms.
-- `Ubuntu/Desktop/GnomeBackend.cs`: platform-only GJS/D-Bus adapter to the Shell extension.
-- `SelfTests.cs`: Windows executable's self-test harness; not directly runnable on Ubuntu.
-- `assets/`: original project icon; do not replace it during the port unless requested.
+- `NativeApp/`: shared C++ policy, wxWidgets settings and tray, platform backends, and native tests.
+- `Ubuntu/extension/`, `Ubuntu/plasma-wallpaper/`: compositor-specific wallpaper integrations.
+- `Ubuntu/shared/`: common Linux shift runtime.
+- `translations/`: shared language files.
+- `assets/`: project icon and generator. Keep the existing icon unless requested.
 
-Read `docs/ARCHITECTURE.md`. Keep shared logic behind platform-neutral interfaces and ProjectReference, rather than copying UI/controller code into each entry point. Registry, `System.Drawing.Common`, COM and `user32.dll` belong only to Windows. GNOME compositor operations remain in the Shell extension; generated trajectory/default data comes from Core.
+Read `docs/ARCHITECTURE.md`. Keep system operations in their respective backends. Generate trajectory, timing and defaults for desktop plugins from the shared C++ policy.
 
 ## Behavioral requirements
 
@@ -42,6 +37,6 @@ Read `docs/ARCHITECTURE.md`. Keep shared logic behind platform-neutral interface
 
 ## Validation
 
-Shared: `dotnet run --project Tests/CoreTests.csproj -c Release` on either OS. Windows: `./build.ps1`, then `release/OpenOLEDShifter.exe --self-test` and `--smoke-test`. Tests write to `artifacts/`; self-tests may create/move their own fixture window but must not shift the user's desktop.
+Native: run CTest from the CMake build directory. On Windows, run `./build.ps1 -WxSource <path>` and then `release/windows-x64/OpenOLEDShifter.exe --smoke-test`. Tests may move their own fixture windows only.
 
 Ubuntu: record the actual distribution, GNOME/KDE version, `XDG_SESSION_TYPE`, display scales and monitor layout before selecting a backend. Build headless tests for the reusable core first. Run visible desktop integration tests in an explicitly chosen test session/fixture, documenting their effects and cleanup. Never report a Windows-only test as proof of Linux support.

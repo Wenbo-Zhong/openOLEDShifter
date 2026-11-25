@@ -63,14 +63,8 @@ int main(int argc, char** argv) try {
         js << "{\"Restore\":" << step.restore << ",\"Shift\":" << step.shift
            << ",\"ResetDeadline\":" << step.reset_deadline << '}';
     }
-    js << "];\nexport const translations = new Map([\n";
-    for (const auto& [locale, messages] : localization::load()) {
-        js << '[' << std::quoted(locale) << ", new Map([\n";
-        for (const auto& [key, value] : messages)
-            js << '[' << std::quoted(key) << ", " << std::quoted(value) << "],\n";
-        js << "])],\n";
-    }
-    js << "]);\n";
+    js << "];\n";
+    (void)localization::load();
     js.close();
     return 0;
 } catch (const std::exception& error) {

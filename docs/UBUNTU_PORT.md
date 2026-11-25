@@ -19,20 +19,20 @@
 
 Windows 原型按端点往返方式使用这些点，壁纸每次从原图重绘，图标层从初始坐标计算偏移。没有证明原版所有机型/分支都使用完全相同的图像处理或 FSE 激活规则。细节与证据 ID 见 `analysis/BEHAVIOR.md`。
 
-Windows 位移后端使用 Win32、COM、GDI+，监视器查询及测试夹具也直接使用 Win32；不再依赖 WinForms。桌面设置与托盘使用 Avalonia UI。两端通过项目引用使用相同的 Core / Desktop 库，接口与连接生命周期见 [架构说明](ARCHITECTURE.md)。Windows 的桌面自测不是 Ubuntu 的集成测试。
+Windows 位移后端使用 Win32、COM 和 GDI+。Windows 和 Linux 共用 C++ 位移规则与 wxWidgets 设置界面。Windows 的桌面测试不能代替 Ubuntu 的集成测试。
 
 ## 已实现
 
-- `Core/` 保存共享默认参数、轨迹、设置契约、输入验证、连接串行化和原子保存。Windows 使用共享 C# 调度器，Ubuntu 的构建工具直接引用该库，为 GNOME 扩展生成轨迹和设置范围。Shell 内的 GLib 调度仍属平台实现。
+- `NativeApp/` 保存共享默认参数、轨迹、调度规则和设置契约。构建工具为 GNOME 和 Plasma 生成插件数据。
 - GNOME Shell 扩展只操作桌面壁纸 actor。物理偏移除以各显示器的缩放系数后写入逻辑坐标。位移以零平移为基准。扩展只在实际平移仍匹配最后写入值时恢复，遇到其他组件改变平移时暂停该 actor。GNOME 更换壁纸时使用新 actor。
 - 扩展在写入前记录恢复意图。该记录与图层状态都位于 Shell 进程内，退出或崩溃时由 compositor 一并销毁。壁纸设置和源文件无需持久化恢复。
-- 顶部面板可按会话启停。两端共用 `Desktop/` 中的 Avalonia 设置窗口和输入校验。Ubuntu 窗口通过会话 D-Bus 读取状态并提交设置，GNOME 扩展负责调度与位移。扩展停用时释放 D-Bus 对象、定时器、监听器和图层平移。
+- 顶部面板可按会话启停。两端共用 `NativeApp/` 中的 wxWidgets 设置窗口和输入校验。Ubuntu 窗口通过会话 D-Bus 读取状态并提交设置，GNOME 扩展负责调度与位移。扩展停用时释放 D-Bus 对象、定时器、监听器和图层平移。
 
 ## 验证环境
 
 - 目标桌面为 Ubuntu 26.04.1 LTS、GNOME Shell 50.1、Wayland。Mutter 报告单个内屏 `eDP-1` 位于 `(0, 0)`，3840×2400 @ 60 Hz，200% 缩放。
 - 使用同一系统上的独立 GNOME Shell Wayland 会话、私有 D-Bus 和临时设置目录，运行 1920×1200 虚拟显示器和合成壁纸。在 200% 下，对偏移前后截图的中央区域逐像素比较，确认向右移动 1 个输出像素，停止后区域恢复一致。还验证了换壁纸、停用扩展和设置窗口。测试会话退出后清理临时文件。
-- Avalonia 迁移后，Ubuntu 自包含应用在本机 XWayland 会话的 200% 缩放下通过窗口渲染测试。隔离 GNOME 会话验证了安装、卸载、状态读取、设置提交、立即位移和暂停。
+- 早期 Avalonia 版本曾验证：Ubuntu 自包含应用在本机 XWayland 会话的 200% 缩放下通过窗口渲染测试。隔离 GNOME 会话验证了安装、卸载、状态读取、设置提交、立即位移和暂停。
 - 实体 OLED、实际锁屏和系统休眠、热插拔、分数缩放和其他桌面环境仍需验证。Windows 项目在 Ubuntu 上交叉编译通过。Windows 自测和托盘 smoke test 仍需 Windows 桌面。
 
 ## 后续范围

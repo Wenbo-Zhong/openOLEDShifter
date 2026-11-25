@@ -17,33 +17,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: '8.0.x'
-      - name: Test shared core
-        run: dotnet run --project Tests/CoreTests.csproj -c Release
-      - name: Build Windows x64
-        run: ./build.ps1
-      - name: Verify single-file publish
-        shell: pwsh
-        run: |
-          $expected = 'LICENSE', 'OpenOLEDShifter.exe', 'README.md'
-          $actual = Get-ChildItem release/windows-x64 -Force -Name
-          if (Compare-Object $expected $actual) {
-            throw "Unexpected Windows publish contents: $($actual -join ', ')"
-          }
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: OpenOLEDShifter-win-x64
-          path: release/windows-x64/
-          if-no-files-found: error
-
-  native:
-    runs-on: windows-2025
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: wxWidgets/wxWidgets
@@ -52,21 +25,9 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - name: Build native Windows x64
-        run: |
-          cmake -S NativeApp -B artifacts/native-windows -A x64 -DOPENOLED_BUILD_UI=ON "-DOPENOLED_WX_SOURCE=$env:GITHUB_WORKSPACE/artifacts/wxWidgets"
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cmake --build artifacts/native-windows --config Release --parallel
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          ctest --test-dir artifacts/native-windows -C Release --output-on-failure
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Stage native artifact
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $destination = New-Item -ItemType Directory -Path release/native-windows-x64 -Force
-          Copy-Item -LiteralPath artifacts/native-windows/Release/OpenOLEDShifter.exe,LICENSE,README.md -Destination $destination.FullName
-          Copy-Item -LiteralPath artifacts/wxWidgets/docs/licence.txt -Destination "$($destination.FullName)/wxWidgets-LICENSE.txt"
+        run: ./build.ps1 -WxSource artifacts/wxWidgets
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: OpenOLEDShifter-native-win-x64
-          path: release/native-windows-x64/
+          name: OpenOLEDShifter-win-x64
+          path: release/windows-x64/
           if-no-files-found: error

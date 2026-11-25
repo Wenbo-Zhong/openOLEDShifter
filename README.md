@@ -4,7 +4,7 @@
 
 **Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持多屏及整数、125% 和 150% 缩放。两端默认使用 200 秒间隔和九点往返轨迹。
 
-Ubuntu 打包入口和 Windows 原生预览均使用 **C++ + wxWidgets**。Windows 正式发布仍由 Avalonia 和 .NET 8 提供完整桌面功能。[架构与迁移状态](docs/ARCHITECTURE.md)
+Windows 和 Ubuntu 默认发布 **C++ + wxWidgets** 原生版。[架构与迁移状态](docs/ARCHITECTURE.md)
 
 原生界面跟随系统语言和浅色／深色偏好。简体中文、繁体中文和英文可自动识别，其他语言使用英文。设置窗口支持高 DPI 和滚动布局。
 
@@ -70,9 +70,9 @@ unzip -o ./release/ubuntu/openoledshifter-plasma.zip -d "$plugin"
 
 ## Windows 使用
 
-从 GitHub Actions 下载 **OpenOLEDShifter-win-x64** 并双击解压出的 `OpenOLEDShifter.exe` 打开设置。EXE 可单独移动，运行时已内置，无需另外安装 .NET。也可以通过托盘图标打开设置。关闭设置窗口后仍在托盘运行，右键选择“退出并恢复”结束。
+从 GitHub Actions 下载 **OpenOLEDShifter-win-x64**，解压并双击单文件 EXE。wxWidgets 静态链接，无需安装 .NET。关闭设置窗口后程序继续在托盘运行，右键选择「退出并还原」结束。
 
-原生预览由 **OpenOLEDShifter-native-win-x64** 构建产物提供。它使用静态链接的 wxWidgets，EXE 不含 .NET。新旧版本共用单实例锁。试用前请从旧版托盘选择退出并恢复，再打开预览版。预览版首次使用需手动启用位移并保存设置。
+升级前，请先从旧版托盘选择退出并还原。新旧版本共用单实例锁。新版首次使用需手动启用位移并保存设置。
 
 原生版的「登录 Windows 时自动启动」开关即时生效。开启时，程序会将 EXE 放到 `%LOCALAPPDATA%\Programs\OpenOLEDShifter` 并登记登录启动；关闭时移除登记项。要让位移也自动开始，请另行勾选「启用定时位移」并保存。
 
@@ -102,23 +102,17 @@ unzip -o ./release/ubuntu/openoledshifter-plasma.zip -d "$plugin"
 
 ## Windows 构建和测试
 
-本地构建要求 Windows 10/11 x64 和 .NET 8 SDK。发布脚本生成 Windows x64 单文件 EXE。首次启动时，程序会将内置的本机库解包到系统临时目录。现有设置和恢复记录仍存放在用户目录。
+本地构建需要 Windows x64 C++ 工具链、CMake 和包含子模块的 wxWidgets 源码。GitHub Actions 使用固定的 wxWidgets 3.3.4。
 
 ```powershell
-.\build.ps1
-dotnet run --project Tests/CoreTests.csproj -c Release
-.\release\windows-x64\OpenOLEDShifter.exe --self-test
+.\build.ps1 -WxSource C:/src/wxWidgets
 .\release\windows-x64\OpenOLEDShifter.exe --smoke-test
 ```
 
-`--self-test` 仅移动自身创建的测试窗口、用合成图片测试渲染，不修改用户壁纸、任务栏、桌面图标或华硕设置。结果写入当前目录的 `artifacts\tests.txt`。
-
-`--smoke-test` 创建托盘和设置窗口，渲染 `artifacts\settings-preview.png` 后退出，不启用实际位移。
-
-参见 [静态分析记录](analysis/BEHAVIOR.md)。Windows 初始验证为 11 项自测通过和一次发布包 UI smoke test；测试输出位于本地 `artifacts/tests.txt`，不提交到仓库。本项目独立编写，不依赖或分发华硕可执行文件。
+构建脚本运行 CTest 并将 EXE 和许可证放到 `release/windows-x64`。
 
 ## 开源与贡献
 
-代码、图标及项目文档以 **GPL-3.0-only** 发布，完整条款见 `LICENSE`。Avalonia UI 及其运行时依赖、.NET 均保留各自许可证。图标生成脚本需要 Pillow，但生成的图标已提交，正常构建不需要安装 Python/Pillow。
+代码、图标及项目文档以 **GPL-3.0-only** 发布，完整条款见 `LICENSE`。wxWidgets 保留其独立许可证。图标生成脚本需要 Pillow，但生成的图标已提交，正常构建不需要安装 Python/Pillow。
 
 欢迎提交 Ubuntu、其他 Linux 桌面和 Windows 改进。新增后端需要明确桌面环境、会话类型（X11/Wayland）、支持范围和还原行为，不能只在设置里增加开关而没有实际实现。
