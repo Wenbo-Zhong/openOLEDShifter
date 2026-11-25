@@ -1,0 +1,11 @@
+{
+  "KPackageStructure": "Plasma/Wallpaper",
+  "KPlugin": {
+    "Id": "org.openoledshifter.wallpaper",
+    "Name": "OpenOLEDShifter",
+    "Description": "Pixel shifting for a local static wallpaper",
+    "Description[zh_CN]": "本地静态壁纸像素位移",
+    "Icon": "preferences-desktop-wallpaper",
+    "License": "GPL-3.0-only"
+  }
+}

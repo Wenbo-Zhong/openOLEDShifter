@@ -41,14 +41,18 @@ struct State {
     std::vector<DisplayChoice> wallpaper_displays;
 };
 
-enum class Command { Read, Apply, Pause, Shift, SetStartup, Toggle };
+enum class Command { Read, Apply, Pause, Shift, SetStartup, Toggle, Setup };
 
 class Backend {
 public:
     virtual ~Backend() = default;
     virtual const char* description() const = 0;
     virtual const char* failure_hint() const = 0;
+    virtual const char* setup_label() const { return nullptr; }
     virtual DesktopFeatures features() const { return {}; }
+    virtual const char* login_label() const { return "Start shifting at login"; }
+    virtual bool supports_login_startup() const { return true; }
+    virtual bool supports_manual_shift() const { return true; }
     virtual bool use_worker() const { return true; }
     virtual State call(Command command, const Settings& settings) = 0;
 };

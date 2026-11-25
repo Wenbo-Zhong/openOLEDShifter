@@ -110,7 +110,8 @@ class SettingsApp final : public wxApp {
         add("Pause / continue", G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
             oled::send_tray_command(static_cast<SettingsApp*>(data)->GetTopWindow(), oled::Command::Toggle);
         }));
-        add("Shift once", G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
+        if (oled::desktop_backend().supports_manual_shift())
+            add("Shift once", G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
             oled::send_tray_command(static_cast<SettingsApp*>(data)->GetTopWindow(), oled::Command::Shift);
         }));
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());

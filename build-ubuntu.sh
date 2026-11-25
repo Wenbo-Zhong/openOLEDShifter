@@ -51,6 +51,18 @@ gjs -m "$extension/cycles.js"
 gjs -m Ubuntu/translation-test.js
 desktop-file-validate "$stage/usr/share/applications/$desktop_id.desktop"
 
+plasma="$stage/usr/share/plasma/wallpapers/org.openoledshifter.wallpaper"
+bash Ubuntu/packaging/stage-plasma.sh "$extension/cycles.js" "$plasma"
+for source in "$extension" "$plasma"; do
+    if [[ "$source" == "$extension" ]]; then
+        bundle="$uuid.shell-extension.zip"
+    else
+        bundle=openoledshifter-plasma.zip
+    fi
+    (cd "$source" && zip -qr "$stage/$bundle" .)
+    mv "$stage/$bundle" "$output/"
+done
+
 install -Dm0755 "$stage/native-build/OpenOLEDShifter" "$app/OpenOLEDShifter"
 rm -rf -- "$stage/native-build"
 
@@ -64,11 +76,12 @@ Section: utils
 Priority: optional
 Maintainer: OpenOLEDShifter contributors <108850792+Wenbo-Zhong@users.noreply.github.com>
 Installed-Size: $(du -sk "$stage/usr" | cut -f1)
-Depends: gnome-shell (>= 50~), gnome-shell (<< 51~), gjs, libwxgtk3.2-1t64, libgtk-3-0t64, libglib2.0-0t64, libjson-glib-1.0-0, libayatana-appindicator3-1, libstdc++6
+Depends: libwxgtk3.2-1t64, libgtk-3-0t64, libglib2.0-0t64, libjson-glib-1.0-0, libayatana-appindicator3-1, libstdc++6
+Suggests: gnome-shell, plasma-workspace
 Homepage: https://github.com/Wenbo-Zhong/openOLEDShifter
-Description: OLED wallpaper pixel shifting for GNOME Wayland
- OpenOLEDShifter shifts a static wallpaper on supported displays using a GNOME
- Shell extension. A wxWidgets settings window is available in the app grid.
+Description: OLED wallpaper pixel shifting for GNOME and KDE Plasma
+ Includes a GNOME Shell extension and a KDE Plasma wallpaper plugin.
+ A wxWidgets settings window is available in the app grid.
 CONTROL
 
     local artifact="$output/${name}_${version}_${arch}.deb"

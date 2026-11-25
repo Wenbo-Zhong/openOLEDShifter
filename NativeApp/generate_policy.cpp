@@ -37,7 +37,11 @@ int main(int argc, char** argv) try {
     std::ofstream js;
     js.exceptions(std::ios::failbit | std::ios::badbit);
     js.open(argv[3], std::ios::binary);
-    js << "// SPDX-License-Identifier: GPL-3.0-only\nexport const cycles = {";
+    js << "// SPDX-License-Identifier: GPL-3.0-only\n"
+       << "export const defaults = {interval:" << default_interval << ",radius:" << default_radius
+       << ",minInterval:" << min_interval << ",maxInterval:" << max_interval
+       << ",minRadius:" << min_radius << ",maxRadius:" << max_radius << "};\n"
+       << "export const cycles = {";
     for (int radius = min_radius; radius <= max_radius; ++radius) {
         if (radius != min_radius)
             js << ',';

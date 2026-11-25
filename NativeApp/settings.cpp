@@ -30,6 +30,12 @@ public:
         status_ = new wxStaticText(panel, wxID_ANY, status_text_);
         layout->Add(status_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(14));
 
+        if (const auto* label = desktop_backend().setup_label()) {
+            setup_ = new wxButton(panel, wxID_ANY, ui_text(label));
+            setup_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { begin(Command::Setup); });
+            layout->Add(setup_, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(14));
+        }
+
         const auto features = desktop_backend().features();
         immediate_startup_ = features.immediate_startup;
         columns_ = new wxBoxSizer(wxHORIZONTAL);
@@ -38,7 +44,7 @@ public:
         auto* timing_parent = timing->GetStaticBox();
         enabled_ = new wxCheckBox(timing_parent, wxID_ANY, ui_text("Enable timed shifts"));
         login_ = new wxCheckBox(timing_parent, wxID_ANY,
-                               ui_text(immediate_startup_ ? "Start Windows app at login" : "Start shifting at login"));
+                               ui_text(immediate_startup_ ? "Start Windows app at login" : desktop_backend().login_label()));
         interval_ = new wxSpinCtrl(timing_parent, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
                                   wxSP_ARROW_KEYS, min_interval, max_interval, default_interval);
         radius_ = new wxSpinCtrl(timing_parent, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
@@ -51,7 +57,10 @@ public:
         fields->Add(new wxStaticText(timing_parent, wxID_ANY, ui_text("Maximum shift (physical pixels)")), 0, wxALIGN_CENTER_VERTICAL);
         fields->Add(radius_, 0, wxEXPAND);
         timing->Add(fields, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(8));
-        timing->Add(login_, 0, wxALL, FromDIP(8));
+        if (desktop_backend().supports_login_startup())
+            timing->Add(login_, 0, wxALL, FromDIP(8));
+        else
+            login_->Hide();
         add_option(timing_parent, timing, features.fullscreen_pause, "Pause for full-screen activity", &Settings::pause_fullscreen);
 
         if (features.wallpaper_toggle || features.desktop_icons || features.taskbar_auto_hide ||
@@ -91,6 +100,8 @@ public:
         auto* buttons = new wxWrapSizer(wxHORIZONTAL);
         for (const auto& [label, command] : {std::pair{"Save", Command::Apply},
                     {"Pause and restore", Command::Pause}, {"Shift once", Command::Shift}}) {
+            if (command == Command::Shift && !desktop_backend().supports_manual_shift())
+                continue;
             auto* button = new wxButton(panel, wxID_ANY, ui_text(label));
             if (command == Command::Apply)
                 button->SetDefault();
@@ -99,6 +110,7 @@ public:
             buttons_.push_back(button);
         }
         layout->Add(buttons, 0, wxALIGN_RIGHT | wxALL, FromDIP(14));
+
 
         note_ = new wxStaticText(panel, wxID_ANY,
             ui_text(desktop_backend().description()));
@@ -188,6 +200,11 @@ private:
     }
 
     void controls() {
+        if (setup_) {
+            if (setup_->Show(!connected_))
+                panel_->Layout();
+            setup_->Enable(!pending_.valid());
+        }
         for (auto* button : buttons_)
             button->Enable(connected_ && !pending_.valid());
         const bool editable = connected_ && (!pending_.valid() || command_ == Command::Read);
@@ -352,6 +369,7 @@ private:
     wxSpinCtrl* interval_;
     wxSpinCtrl* radius_;
     wxStaticText* status_;
+    wxButton* setup_ = nullptr;
     wxChoice* display_ = nullptr;
     wxTextCtrl* processes_ = nullptr;
     std::vector<DisplayChoice> displays_;
