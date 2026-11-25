@@ -64,7 +64,7 @@ Section: utils
 Priority: optional
 Maintainer: OpenOLEDShifter contributors <108850792+Wenbo-Zhong@users.noreply.github.com>
 Installed-Size: $(du -sk "$stage/usr" | cut -f1)
-Depends: gnome-shell (>= 50~), gnome-shell (<< 51~), gjs, libwxgtk3.2-1t64, libglib2.0-0t64, libjson-glib-1.0-0, libstdc++6
+Depends: gnome-shell (>= 50~), gnome-shell (<< 51~), gjs, libwxgtk3.2-1t64, libgtk-3-0t64, libglib2.0-0t64, libjson-glib-1.0-0, libstdc++6
 Homepage: https://github.com/Wenbo-Zhong/openOLEDShifter
 Description: OLED wallpaper pixel shifting for GNOME Wayland
  OpenOLEDShifter shifts a static wallpaper on a single display using a GNOME

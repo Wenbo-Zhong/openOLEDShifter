@@ -3,6 +3,7 @@
 #include "settings_frame.hpp"
 #include "settings_backend.hpp"
 #include "windows_host.hpp"
+#include "ui_text.hpp"
 
 #include <wx/app.h>
 #include <wx/bmpbndl.h>
@@ -85,11 +86,11 @@ public:
 private:
     wxMenu* CreatePopupMenu() override {
         auto* menu = new wxMenu;
-        menu->Append(wxID_OPEN, "Open settings");
-        menu->Append(tray_toggle, "Pause / continue");
-        menu->Append(tray_shift, "Shift once");
+        menu->Append(wxID_OPEN, oled::ui_text("Open settings"));
+        menu->Append(tray_toggle, oled::ui_text("Pause / continue"));
+        menu->Append(tray_shift, oled::ui_text("Shift once"));
         menu->AppendSeparator();
-        menu->Append(wxID_EXIT, "Exit and restore");
+        menu->Append(wxID_EXIT, oled::ui_text("Exit and restore"));
         return menu;
     }
 };
@@ -120,6 +121,7 @@ class WindowsApp final : public wxApp {
                 throw std::runtime_error("Cannot subscribe to Windows session changes");
             registered_ = !smoke_;
             SetAppName("OpenOLEDShifter");
+            MSWEnableDarkMode(DarkMode_Auto);
             auto* frame = oled::create_settings_frame();
             SetTopWindow(frame);
             frame->Bind(wxEVT_CLOSE_WINDOW, [frame](wxCloseEvent& event) {
@@ -174,7 +176,7 @@ class WindowsApp final : public wxApp {
         const bool restored = oled::win::shutdown();
         clean_up();
         if (!restored)
-            wxMessageBox("Desktop recovery is pending. Reopen OpenOLEDShifter to retry.",
+            wxMessageBox(oled::ui_text("Desktop recovery is pending. Reopen OpenOLEDShifter to retry."),
                          "OpenOLEDShifter", wxOK | wxICON_WARNING);
         return restored ? result : 1;
     }

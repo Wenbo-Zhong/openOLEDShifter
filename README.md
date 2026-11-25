@@ -6,6 +6,10 @@
 
 Ubuntu 打包入口和 Windows 原生预览均使用 **C++ + wxWidgets**。Windows 正式发布仍由 Avalonia 和 .NET 8 提供完整桌面功能。[架构与迁移状态](docs/ARCHITECTURE.md)
 
+原生界面跟随系统语言和浅色／深色偏好。简体中文、繁体中文和英文可自动识别，其他语言使用英文。设置窗口支持高 DPI 和滚动布局。GNOME 壁纸位移仍要求整数缩放。
+
+翻译文案按语言保存在 [translations](translations/README.md)。新增语言只需提交对应的翻译文件。
+
 ![OpenOLEDShifter icon](assets/app-icon.png)
 
 协议：[GNU GPL v3.0 only](LICENSE)。Ubuntu 上的 Codex 请先阅读 [AGENTS.md](AGENTS.md) 和 [Ubuntu 适配接手说明](docs/UBUNTU_PORT.md)。
@@ -23,7 +27,7 @@ DEB 面向 Ubuntu 26.04。RPM 面向使用 GNOME 50 Wayland 的 Fedora 44，可�
 用 `./build-ubuntu.sh` 构建。在 Ubuntu x64 上生成 `release/ubuntu/openoledshifter_0.1.0_amd64.deb`。构建前安装工具和头文件：
 
 ```sh
-sudo apt install cmake g++ pkg-config libwxgtk3.2-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils
+sudo apt install cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils
 ./build-ubuntu.sh
 ```
 
@@ -55,6 +59,8 @@ sudo apt remove openoledshifter
 从 GitHub Actions 下载 **OpenOLEDShifter-win-x64** 并双击解压出的 `OpenOLEDShifter.exe` 打开设置。EXE 可单独移动，运行时已内置，无需另外安装 .NET。也可以通过托盘图标打开设置。关闭设置窗口后仍在托盘运行，右键选择“退出并恢复”结束。
 
 原生预览由 **OpenOLEDShifter-native-win-x64** 构建产物提供。它使用静态链接的 wxWidgets，EXE 不含 .NET。新旧版本共用单实例锁。试用前请从旧版托盘选择退出并恢复，再打开预览版。预览版首次使用需手动启用位移并保存设置。
+
+原生版的「登录 Windows 时自动启动」开关即时生效。开启时，程序会将 EXE 放到 `%LOCALAPPDATA%\Programs\OpenOLEDShifter` 并登记登录启动；关闭时移除登记项。要让位移也自动开始，请另行勾选「启用定时位移」并保存。
 
 检测到 `AsusOLEDShifter.exe` 时会自动暂停，避免两套工具叠加。在 MyASUS 中关闭原版像素位移后，可通过本工具启用；本工具不会停止或禁用任何华硕服务。如果原版后台仍存在，会继续保持暂停。
 

@@ -2,9 +2,13 @@
 // Copyright (c) 2026 OpenOLEDShifter contributors
 #include "settings_backend.hpp"
 #include "settings_frame.hpp"
+#include "ui_text.hpp"
 
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
+#include <wx/display.h>
+#include <wx/scrolwin.h>
+#include <wx/wrapsizer.h>
 #include <algorithm>
 #include <future>
 #include <utility>
@@ -15,88 +19,148 @@ using namespace oled;
 class SettingsFrame final : public wxFrame {
 public:
     SettingsFrame() : wxFrame(nullptr, wxID_ANY, "OpenOLEDShifter"), timer_(this) {
-        auto* panel = new wxPanel(this);
+        panel_ = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL | wxTAB_TRAVERSAL);
+        auto* panel = panel_;
+        panel_->SetScrollRate(0, FromDIP(16));
         auto* layout = new wxBoxSizer(wxVERTICAL);
-        enabled_ = new wxCheckBox(panel, wxID_ANY, "Enable timed shifts");
-        login_ = new wxCheckBox(panel, wxID_ANY, "Start shifting at login");
-        interval_ = new wxSpinCtrl(panel, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
-                                  wxSP_ARROW_KEYS, min_interval, max_interval, default_interval);
-        radius_ = new wxSpinCtrl(panel, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
-                                wxSP_ARROW_KEYS, min_radius, max_radius, default_radius);
-        auto* fields = new wxFlexGridSizer(2, 8, 12);
-        fields->Add(new wxStaticText(panel, wxID_ANY, "Interval (seconds)"), 0, wxALIGN_CENTER_VERTICAL);
-        fields->Add(interval_);
-        fields->Add(new wxStaticText(panel, wxID_ANY, "Maximum shift (physical pixels)"), 0, wxALIGN_CENTER_VERTICAL);
-        fields->Add(radius_);
-        layout->Add(enabled_, 0, wxALL, 10);
-        layout->Add(fields, 0, wxLEFT | wxRIGHT, 10);
-        layout->Add(login_, 0, wxALL, 10);
+        auto* heading = new wxStaticText(panel, wxID_ANY, ui_text("OLED pixel shifting"));
+        heading->SetFont(heading->GetFont().Larger().Larger().Bold());
+        layout->Add(heading, 0, wxALL, FromDIP(14));
+        status_ = new wxStaticText(panel, wxID_ANY, status_text_);
+        layout->Add(status_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(14));
 
         const auto features = desktop_backend().features();
-        add_option(panel, layout, features.wallpaper_toggle, "Shift static wallpaper", &Settings::wallpaper);
-        add_option(panel, layout, features.desktop_icons, "Shift desktop icons", &Settings::desktop_icons);
-        add_option(panel, layout, features.taskbar_auto_hide, "Auto-hide taskbar while active", &Settings::taskbar_auto_hide);
-        add_option(panel, layout, features.application_windows, "Pause for full-screen activity", &Settings::pause_fullscreen);
-        add_option(panel, layout, features.application_windows, "Shift recognized full-screen shell windows", &Settings::shift_fullscreen_shell);
-        if (features.wallpaper_monitor_selection) {
-            auto* target = new wxBoxSizer(wxHORIZONTAL);
-            target->Add(new wxStaticText(panel, wxID_ANY, "Wallpaper / window display"), 0,
-                        wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
-            display_ = new wxChoice(panel, wxID_ANY);
-            display_->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) { dirty_ = true; });
-            target->Add(display_, 1, wxALIGN_CENTER_VERTICAL);
-            layout->Add(target, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+        immediate_startup_ = features.immediate_startup;
+        columns_ = new wxBoxSizer(wxHORIZONTAL);
+        auto* timing = new wxStaticBoxSizer(wxVERTICAL, panel, ui_text("Schedule"));
+        columns_->Add(timing, 1, wxEXPAND | wxALL, FromDIP(5));
+        auto* timing_parent = timing->GetStaticBox();
+        enabled_ = new wxCheckBox(timing_parent, wxID_ANY, ui_text("Enable timed shifts"));
+        login_ = new wxCheckBox(timing_parent, wxID_ANY,
+                               ui_text(immediate_startup_ ? "Start Windows app at login" : "Start shifting at login"));
+        interval_ = new wxSpinCtrl(timing_parent, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
+                                  wxSP_ARROW_KEYS, min_interval, max_interval, default_interval);
+        radius_ = new wxSpinCtrl(timing_parent, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
+                                wxSP_ARROW_KEYS, min_radius, max_radius, default_radius);
+        timing->Add(enabled_, 0, wxALL, FromDIP(8));
+        auto* fields = new wxFlexGridSizer(2, FromDIP(8), FromDIP(12));
+        fields->AddGrowableCol(0);
+        fields->Add(new wxStaticText(timing_parent, wxID_ANY, ui_text("Interval (seconds)")), 0, wxALIGN_CENTER_VERTICAL);
+        fields->Add(interval_, 0, wxEXPAND);
+        fields->Add(new wxStaticText(timing_parent, wxID_ANY, ui_text("Maximum shift (physical pixels)")), 0, wxALIGN_CENTER_VERTICAL);
+        fields->Add(radius_, 0, wxEXPAND);
+        timing->Add(fields, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(8));
+        timing->Add(login_, 0, wxALL, FromDIP(8));
+        add_option(timing_parent, timing, features.application_windows, "Pause for full-screen activity", &Settings::pause_fullscreen);
+
+        if (features.wallpaper_toggle || features.desktop_icons || features.taskbar_auto_hide ||
+            features.wallpaper_monitor_selection) {
+            has_targets_ = true;
+            auto* targets = new wxStaticBoxSizer(wxVERTICAL, panel, ui_text("Desktop targets"));
+            columns_->Add(targets, 1, wxEXPAND | wxALL, FromDIP(5));
+            auto* parent = targets->GetStaticBox();
+            targets->AddSpacer(FromDIP(6));
+            add_option(parent, targets, features.wallpaper_toggle, "Shift static wallpaper", &Settings::wallpaper);
+            add_option(parent, targets, features.desktop_icons, "Shift desktop icons", &Settings::desktop_icons);
+            add_option(parent, targets, features.taskbar_auto_hide, "Auto-hide taskbar while active", &Settings::taskbar_auto_hide);
+            if (features.wallpaper_monitor_selection) {
+                targets->Add(new wxStaticText(parent, wxID_ANY, ui_text("Wallpaper / window display")), 0,
+                             wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(8));
+                display_ = new wxChoice(parent, wxID_ANY);
+                display_->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) { mark_dirty(); });
+                targets->Add(display_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(8));
+            }
         }
+        layout->Add(columns_, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(9));
+
         if (features.application_windows) {
-            layout->Add(new wxStaticText(panel, wxID_ANY, "Application processes to shift"), 0,
-                        wxLEFT | wxRIGHT | wxBOTTOM, 10);
-            processes_ = new wxTextCtrl(panel, wxID_ANY);
-            processes_->SetHint("For example: notepad.exe, explorer.exe");
+            auto* applications = new wxStaticBoxSizer(wxVERTICAL, panel, ui_text("Application windows"));
+            auto* parent = applications->GetStaticBox();
+            applications->Add(new wxStaticText(parent, wxID_ANY, ui_text("Application processes to shift")), 0,
+                              wxALL, FromDIP(8));
+            processes_ = new wxTextCtrl(parent, wxID_ANY);
+            processes_->SetHint(ui_text("For example: notepad.exe, explorer.exe"));
             processes_->SetMaxLength(2048);
-            processes_->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { dirty_ = true; });
-            layout->Add(processes_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+            processes_->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { mark_dirty(); });
+            applications->Add(processes_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(8));
+            add_option(parent, applications, true, "Shift recognized full-screen shell windows", &Settings::shift_fullscreen_shell);
+            layout->Add(applications, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(14));
         }
 
-        auto* buttons = new wxBoxSizer(wxHORIZONTAL);
+        auto* buttons = new wxWrapSizer(wxHORIZONTAL);
         for (const auto& [label, command] : {std::pair{"Save", Command::Apply},
                     {"Pause and restore", Command::Pause}, {"Shift once", Command::Shift}}) {
-            auto* button = new wxButton(panel, wxID_ANY, label);
+            auto* button = new wxButton(panel, wxID_ANY, ui_text(label));
+            if (command == Command::Apply)
+                button->SetDefault();
             button->Bind(wxEVT_BUTTON, [this, command](wxCommandEvent&) { begin(command); });
-            buttons->Add(button, 0, wxRIGHT, 6);
+            buttons->Add(button, 0, wxRIGHT, FromDIP(6));
             buttons_.push_back(button);
         }
-        layout->Add(buttons, 0, wxALL, 10);
-        status_ = new wxStaticText(panel, wxID_ANY, "Loading settings…");
-        layout->Add(status_, 0, wxEXPAND | wxALL, 10);
-        auto* note = new wxStaticText(panel, wxID_ANY,
-            wxString::FromUTF8(desktop_backend().description()));
-        note->Wrap(420);
-        layout->Add(note, 0, wxALL, 10);
+        layout->Add(buttons, 0, wxALIGN_RIGHT | wxALL, FromDIP(14));
+
+        note_ = new wxStaticText(panel, wxID_ANY,
+            ui_text(desktop_backend().description()));
+
+        layout->Add(note_, 0, wxEXPAND | wxALL, FromDIP(10));
         panel->SetSizer(layout);
         auto* outer = new wxBoxSizer(wxVERTICAL);
         outer->Add(panel, 1, wxEXPAND);
-        SetSizerAndFit(outer);
-        SetMinSize(GetSize());
+        SetSizer(outer);
+        const auto work = wxDisplay(0u).GetClientArea().GetSize();
+        const auto preferred = FromDIP(wxSize(has_targets_ ? 740 : 515, 320));
+        SetSize(wxSize(std::min(preferred.x, work.x), std::min(preferred.y, work.y)));
+        SetMinSize(wxSize(std::min(FromDIP(410), work.x), std::min(FromDIP(240), work.y)));
+        panel_->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
+            event.Skip();
+            wrap_labels();
+        });
+#ifdef _WIN32
+        Bind(wxEVT_DPI_CHANGED, [this](wxDPIChangedEvent& event) {
+            event.Skip();
+            CallAfter([this] {
+                panel_->SetScrollRate(0, FromDIP(16));
+                wrap_width_ = 0;
+                wrap_labels();
+            });
+        });
+#endif
 
-        for (auto* checkbox : {enabled_, login_})
-            checkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { dirty_ = true; });
+        enabled_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mark_dirty(); });
+        login_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+            if (immediate_startup_)
+                begin(Command::SetStartup);
+            else
+                mark_dirty();
+        });
         for (auto* spin : {interval_, radius_}) {
-            spin->Bind(wxEVT_SPINCTRL, [this](wxSpinEvent&) { dirty_ = true; });
-            spin->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { dirty_ = true; });
+            spin->Bind(wxEVT_SPINCTRL, [this](wxSpinEvent&) { mark_dirty(); });
+            spin->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { mark_dirty(); });
         }
         Bind(wxEVT_TIMER, [this](wxTimerEvent&) { poll(); });
+        Layout();
+        wrap_labels();
+        const int frame_height = GetSize().y - GetClientSize().y;
+        SetSize(GetSize().x, std::min(work.y, layout->GetMinSize().y + frame_height + FromDIP(4)));
         timer_.Start(100);
         begin(Command::Read);
     }
 
 private:
-    void add_option(wxPanel* panel, wxBoxSizer* layout, bool supported,
+    void mark_dirty() {
+        if (!dirty_) {
+            dirty_ = true;
+            wrap_labels();
+        }
+    }
+
+    void add_option(wxWindow* panel, wxBoxSizer* layout, bool supported,
                     const char* label, bool Settings::* value) {
         if (!supported)
             return;
-        auto* checkbox = new wxCheckBox(panel, wxID_ANY, label);
-        checkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { dirty_ = true; });
-        layout->Add(checkbox, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10);
+        auto* checkbox = new wxCheckBox(panel, wxID_ANY, ui_text(label));
+        checkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mark_dirty(); });
+        layout->Add(checkbox, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(8));
         options_.emplace_back(checkbox, value);
     }
 
@@ -164,7 +228,7 @@ private:
         if (choices != displays_) {
             display_->Clear();
             for (const auto& choice : choices)
-                display_->Append(wxString::FromUTF8(choice.name));
+                display_->Append(ui_status(choice.name));
             displays_ = std::move(choices);
         }
         const auto index = std::ranges::find_if(displays_, match) - displays_.begin();
@@ -177,6 +241,8 @@ private:
         try {
             auto state = read_state();
             connected_ = true;
+            if (immediate_startup_)
+                login_->SetValue(state.settings.login);
             if (!dirty_ || command_ == Command::Apply || command_ == Command::Pause) {
                 enabled_->SetValue(state.settings.enabled);
                 login_->SetValue(state.settings.login);
@@ -190,18 +256,51 @@ private:
             }
             const auto display = dirty_ ? selected_display() : state.settings.wallpaper_display;
             update_displays(std::move(state.wallpaper_displays), display);
-            status_->SetLabel(wxString::FromUTF8(state.status));
+            status_text_ = ui_status(state.status);
         } catch (const std::exception& error) {
             connected_ = false;
-            status_->SetLabel(wxString::FromUTF8(desktop_backend().failure_hint()) + "\n" +
-                              wxString::FromUTF8(error.what()));
+            status_text_ = ui_text(desktop_backend().failure_hint()) + "\n" + wxString::FromUTF8(error.what());
         }
-        status_->Wrap(420);
-        Layout();
+        wrap_labels();
         next_read_ = Schedule::Clock::now() + std::chrono::seconds(3);
         controls();
     }
 
+    void wrap_labels() {
+        const int content_width = panel_->GetClientSize().x;
+        const int width = std::max(FromDIP(120), content_width - FromDIP(30));
+        if (has_targets_) {
+            const bool wide = content_width >= FromDIP(680);
+            const int orientation = wide ? wxHORIZONTAL : wxVERTICAL;
+            if (columns_->GetOrientation() != orientation) {
+                columns_->SetOrientation(orientation);
+                for (auto* group : columns_->GetChildren())
+                    group->SetProportion(wide ? 1 : 0);
+            }
+        }
+        const auto visible_status = dirty_
+            ? status_text_ + "\n" + ui_text("Unsaved changes. Select Save to apply them.")
+            : status_text_;
+        if (width == wrap_width_ && last_status_ == visible_status)
+            return;
+        wrap_width_ = width;
+        last_status_ = visible_status;
+        status_->SetLabel(visible_status);
+        status_->Wrap(width);
+        note_->SetLabel(ui_text(desktop_backend().description()));
+        note_->Wrap(width);
+        panel_->Layout();
+        panel_->FitInside();
+    }
+
+    wxScrolledWindow* panel_ = nullptr;
+    wxBoxSizer* columns_ = nullptr;
+    bool has_targets_ = false;
+    bool immediate_startup_ = false;
+    wxStaticText* note_ = nullptr;
+    wxString status_text_ = ui_text("Loading settings…");
+    wxString last_status_;
+    int wrap_width_ = 0;
     wxTimer timer_;
     wxCheckBox* enabled_;
     wxCheckBox* login_;

@@ -20,7 +20,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake g++ pkg-config libwxgtk3.2-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils rpm
+          sudo apt-get install -y --no-install-recommends cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-dev libjson-glib-dev gjs libglib2.0-bin desktop-file-utils rpm
       - name: Build DEB and RPM
         run: |
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then

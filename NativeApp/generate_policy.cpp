@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
 #include "shift_core.hpp"
+#include "localization.hpp"
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <utility>
@@ -57,7 +59,14 @@ int main(int argc, char** argv) try {
         js << "{\"Restore\":" << step.restore << ",\"Shift\":" << step.shift
            << ",\"ResetDeadline\":" << step.reset_deadline << '}';
     }
-    js << "];\n";
+    js << "];\nexport const translations = new Map([\n";
+    for (const auto& [locale, messages] : localization::load()) {
+        js << '[' << std::quoted(locale) << ", new Map([\n";
+        for (const auto& [key, value] : messages)
+            js << '[' << std::quoted(key) << ", " << std::quoted(value) << "],\n";
+        js << "])],\n";
+    }
+    js << "]);\n";
     js.close();
     return 0;
 } catch (const std::exception& error) {

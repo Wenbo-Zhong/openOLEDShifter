@@ -38,19 +38,26 @@ fs::path data_root() {
 }
 
 bool is_registered() {
+    std::wstring command(32768, L'\0');
+    DWORD bytes = static_cast<DWORD>(command.size() * sizeof(wchar_t));
     const auto result = RegGetValueW(HKEY_CURRENT_USER, run_key, run_value, RRF_RT_REG_SZ,
-                                    nullptr, nullptr, nullptr);
+                                    nullptr, command.data(), &bytes);
     if (result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND)
         return false;
     check_win(result, "Read login startup");
-    return true;
+    if (bytes < sizeof(wchar_t))
+        return false;
+    command.resize(bytes / sizeof(wchar_t) - 1);
+    const auto end = command.find(L'"', 1);
+    return command.starts_with(L'"') && end != std::wstring::npos &&
+           command.substr(end + 1) == L" --background" && fs::is_regular_file(command.substr(1, end - 1));
 }
 
 void register_startup(bool enabled) {
-    if (!enabled && !is_registered())
-        return;
     if (!enabled) {
-        check_win(RegDeleteKeyValueW(HKEY_CURRENT_USER, run_key, run_value), "Disable login startup");
+        const auto result = RegDeleteKeyValueW(HKEY_CURRENT_USER, run_key, run_value);
+        if (result != ERROR_FILE_NOT_FOUND && result != ERROR_PATH_NOT_FOUND)
+            check_win(result, "Disable login startup");
         return;
     }
     std::wstring executable(32768, L'\0');
@@ -58,9 +65,23 @@ void register_startup(bool enabled) {
     if (size == 0 || size == executable.size())
         throw std::runtime_error("Cannot read executable location");
     executable.resize(size);
-    const auto command = L"\"" + executable + L"\" --background";
+    const auto installed = data_root() / L"Programs" / L"OpenOLEDShifter" / L"OpenOLEDShifter.exe";
+    fs::create_directories(installed.parent_path());
+    if (!fs::exists(installed) || !fs::equivalent(executable, installed)) {
+        const auto staged = installed.wstring() + L".new";
+        fs::copy_file(executable, staged, fs::copy_options::overwrite_existing);
+        if (!MoveFileExW(staged.c_str(), installed.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            const auto error = GetLastError();
+            std::error_code ignored;
+            fs::remove(staged, ignored);
+            check_win(error, "Install login executable");
+        }
+    }
+    const auto command = L"\"" + installed.wstring() + L"\" --background";
     check_win(RegSetKeyValueW(HKEY_CURRENT_USER, run_key, run_value, REG_SZ, command.c_str(),
                              static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t))), "Enable login startup");
+    if (!is_registered())
+        throw std::runtime_error("Windows did not retain the login startup entry");
 }
 
 bool vendor_running() {
@@ -133,7 +154,7 @@ public:
                "Desktop icons and the taskbar apply system-wide.";
     }
     const char* failure_hint() const override { return "Windows settings operation failed."; }
-    DesktopFeatures features() const override { return {true, true, true, true, true}; }
+    DesktopFeatures features() const override { return {true, true, true, true, true, true}; }
     bool use_worker() const override { return false; }
 
     void initialize(bool smoke) {
@@ -177,7 +198,6 @@ public:
         }
         if (win::valid_display_selection(selected))
             settings_.wallpaper_display = std::move(selected);
-        settings_.login = is_registered();
         schedule_.reset(settings_.interval, Schedule::Clock::now());
         if (has_pending_recovery()) {
             try {
@@ -196,6 +216,16 @@ public:
     State call(Command command, const Settings& settings) override {
         if (smoke_ || command == Command::Read)
             return state();
+        if (command == Command::SetStartup) {
+            try {
+                register_startup(settings.login);
+                startup_status_ = settings.login ? "Windows login startup is registered."
+                                                 : "Windows login startup was removed.";
+            } catch (const std::exception& error) {
+                startup_status_ = std::string("Could not change Windows login startup: ") + error.what();
+            }
+            return state();
+        }
         if (command == Command::Apply || command == Command::Pause) {
             try {
                 auto requested = command == Command::Pause ? paused_settings() : settings;
@@ -212,12 +242,8 @@ public:
                     throw std::runtime_error("Close ASUS OLED Shifter before recovering a previous shift");
                 restore();
                 save(requested);
-                const auto actual_login = settings_.login;
                 settings_ = requested;
                 window_processes_ = std::move(processes);
-                settings_.login = actual_login;
-                register_startup(requested.login);
-                settings_.login = requested.login;
                 failed_ = false;
                 schedule_.reset(settings_.interval, Schedule::Clock::now());
                 tick();
@@ -294,6 +320,14 @@ public:
 private:
     State state() const {
         State result{settings_, status_, {{"primary", "Primary display"}, {"all", "All displays"}}};
+        if (!smoke_) {
+            try { result.settings.login = is_registered(); }
+            catch (const std::exception& error) {
+                result.status += "\nCould not read Windows login startup: " + std::string(error.what());
+            }
+            if (!startup_status_.empty())
+                result.status += "\n" + startup_status_;
+        }
         for (const auto& display : displays_)
             result.wallpaper_displays.push_back({display.key(), screen_label(display)});
         if (deferred_wallpapers_)
@@ -324,7 +358,7 @@ private:
         if (ending_ || locked_ || suspended_ || !interactive_desktop())
             return "Paused: Windows session inactive";
         if (!settings_.enabled)
-            return "Paused";
+            return "Paused: timed shifts are turned off in the saved settings";
         if (!settings_.wallpaper && !settings_.desktop_icons && !settings_.taskbar_auto_hide &&
             window_processes_.empty() && !settings_.shift_fullscreen_shell)
             return "Paused: select at least one target";
@@ -490,6 +524,7 @@ private:
     Schedule::Clock::time_point next_display_scan_{};
     std::size_t deferred_wallpapers_ = 0;
     std::string status_;
+    std::string startup_status_;
     int phase_ = 0;
     bool smoke_ = false, locked_ = false, suspended_ = false, ending_ = false, failed_ = false;
     bool shifted_ = false, taskbar_engaged_ = false;

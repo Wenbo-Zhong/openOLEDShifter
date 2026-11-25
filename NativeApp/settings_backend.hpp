@@ -25,6 +25,7 @@ struct DesktopFeatures {
     bool taskbar_auto_hide = false;
     bool wallpaper_monitor_selection = false;
     bool application_windows = false;
+    bool immediate_startup = false;
 };
 
 struct DisplayChoice {
@@ -39,7 +40,7 @@ struct State {
     std::vector<DisplayChoice> wallpaper_displays;
 };
 
-enum class Command { Read, Apply, Pause, Shift };
+enum class Command { Read, Apply, Pause, Shift, SetStartup };
 
 class Backend {
 public:

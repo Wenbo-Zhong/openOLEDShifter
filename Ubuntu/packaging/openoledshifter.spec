@@ -13,7 +13,7 @@ Requires:       gnome-shell >= 50
 Requires:       gnome-shell < 51
 Requires:       gjs
 Requires:       wxGTK >= 3.2
-Requires:       glib2, json-glib, libstdc++
+Requires:       gtk3, glib2, json-glib, libstdc++
 
 %description
 OpenOLEDShifter shifts a static wallpaper on a single display using a GNOME

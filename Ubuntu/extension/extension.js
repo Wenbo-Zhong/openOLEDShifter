@@ -10,8 +10,24 @@ import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {cycles, scheduleTransitions} from './cycles.js';
+import {cycles, scheduleTransitions, translations} from './cycles.js';
 import {WallpaperTranslation} from './translation.js';
+
+const languageTag = (GLib.get_language_names()[0] ?? '').toLowerCase().replaceAll('_', '-').split(/[.@]/, 1)[0];
+function selectLocale(tag) {
+    if (translations.has(tag))
+        return tag;
+    if (tag === 'zh' || tag.startsWith('zh-'))
+        return /^zh-(hant|tw|hk|mo)(-|$)/.test(tag) ? 'zh-hant' : 'zh-hans';
+    for (let separator = tag.lastIndexOf('-'); separator !== -1; separator = tag.lastIndexOf('-')) {
+        tag = tag.slice(0, separator);
+        if (translations.has(tag))
+            return tag;
+    }
+    return 'en';
+}
+const language = selectLocale(languageTag);
+const tr = text => translations.get(language)?.get(text) || translations.get('en')?.get(text) || text;
 
 const desktopInterface = `<node>
   <interface name="org.openoledshifter.Desktop">
@@ -45,19 +61,19 @@ export default class OpenOLEDShifter extends Extension {
             style_class: 'system-status-icon',
         }));
         this._status = new PopupMenu.PopupMenuItem('', {reactive: false});
-        this._toggle = new PopupMenu.PopupSwitchMenuItem('Shift desktop wallpaper', this._requested);
+        this._toggle = new PopupMenu.PopupSwitchMenuItem(tr('Shift desktop wallpaper'), this._requested);
         this._toggle.connect('toggled', (_item, active) => {
             this._requested = active;
             this._restart();
         });
         this._indicator.menu.addMenuItem(this._status);
         this._indicator.menu.addMenuItem(this._toggle);
-        this._indicator.menu.addAction('Settings', () => {
+        this._indicator.menu.addAction(tr('Settings'), () => {
             const app = Shell.AppSystem.get_default().lookup_app('org.openoledshifter.Desktop.desktop');
             if (app)
                 app.activate();
             else
-                Main.notify('OpenOLEDShifter', 'Install the desktop settings application to open Settings.');
+                Main.notify('OpenOLEDShifter', tr('Install the desktop settings application to open Settings.'));
         });
         Main.panel.addToStatusArea(this.uuid, this._indicator);
 
@@ -94,7 +110,7 @@ export default class OpenOLEDShifter extends Extension {
                 Enabled: this._requested,
                 StartAtLogin: this._settings.get_boolean('start-at-login'),
             },
-            Status: this._status.label.text,
+            Status: this._statusText ?? "",
         });
     }
 
@@ -127,6 +143,15 @@ export default class OpenOLEDShifter extends Extension {
         this._requested = active;
         this._toggle.setToggleState(active);
         this._restart();
+    }
+
+    _setStatus(text) {
+        this._statusText = text;
+        const prefix = 'Wallpaper offset: ';
+        const suffix = ' physical px';
+        this._status.label.text = text.startsWith(prefix) && text.endsWith(suffix)
+            ? tr(prefix) + text.slice(prefix.length, -suffix.length) + tr(suffix)
+            : tr(text);
     }
 
     _availability() {
@@ -181,13 +206,13 @@ export default class OpenOLEDShifter extends Extension {
             this._phase = 0;
         }
         if (reason) {
-            this._status.label.text = reason;
+            this._setStatus(reason);
             return;
         }
         if (decision.Shift)
             this._shift(target);
         else if (!this._translation)
-            this._status.label.text = 'Waiting for the next wallpaper shift';
+            this._setStatus('Waiting for the next wallpaper shift');
     }
 
     _shift(target) {
@@ -202,11 +227,11 @@ export default class OpenOLEDShifter extends Extension {
         const [x, y] = cycle[next];
         if (!this._translation.shift(x, y, scale)) {
             this._release();
-            this._status.label.text = 'Paused: another component moved the wallpaper';
+            this._setStatus('Paused: another component moved the wallpaper');
             return;
         }
 
-        this._status.label.text = `Wallpaper offset: ${x}, ${y} physical px`;
+        this._setStatus(`Wallpaper offset: ${x}, ${y} physical px`);
         this._phase = next;
     }
 
@@ -221,7 +246,7 @@ export default class OpenOLEDShifter extends Extension {
     _restart() {
         this._stop();
         if (!this._requested) {
-            this._status.label.text = 'Wallpaper shifting is off';
+            this._setStatus('Wallpaper shifting is off');
             return;
         }
 

@@ -38,6 +38,7 @@ class GnomeBackend final : public Backend {
         const char* method = nullptr;
         GVariant* parameters = nullptr;
         switch (command) {
+        case Command::SetStartup: throw std::invalid_argument("Use Apply to change GNOME startup settings");
         case Command::Read: method = "GetState"; break;
         case Command::Pause: method = "Pause"; break;
         case Command::Shift: method = "Shift"; break;
