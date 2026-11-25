@@ -4,6 +4,7 @@ import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasmoid
 import org.kde.plasma.workspace.dbus as DBus
 import "policy.js" as Policy
+import "shift-runtime.js" as Runtime
 
 WallpaperItem {
     id: root
@@ -23,20 +24,16 @@ WallpaperItem {
     property int lockGeneration: 0
     readonly property bool active: configuration.Enabled && localImage &&
         shifted.status === Image.Ready && visible && !locked && !sleeping && !fullscreen
-    property int phase: 0
-    property double deadline: 0
+    readonly property var runtime: Runtime.createShiftRuntime(Policy.scheduleTransitions)
     property double lastPoll: 0
-    property bool wasBlocked: true
     property real offsetX: 0
     property real offsetY: 0
 
     function reset() {
-        phase = 0
         offsetX = 0
         offsetY = 0
         lastPoll = Date.now()
-        deadline = lastPoll + seconds * 1000
-        wasBlocked = !active
+        runtime?.reset(lastPoll, seconds * 1000)
     }
     onActiveChanged: reset()
     onSecondsChanged: reset()
@@ -122,21 +119,14 @@ WallpaperItem {
                 return
             }
             root.lastPoll = now
-            const blocked = !root.active
-            const flags = (blocked ? 1 : 0) | (blocked !== root.wasBlocked ? 2 : 0)
-                | (root.wasBlocked ? 4 : 0) | (now >= root.deadline ? 8 : 0) | (force ? 16 : 0)
-            const step = Policy.scheduleTransitions[flags]
-            root.wasBlocked = blocked
-            if (step.Restore)
-                root.reset()
-            if (step.ResetDeadline)
-                root.deadline = now + root.seconds * 1000
-            if (step.Shift) {
-                const cycle = Policy.cycles[root.radius]
-                root.phase = cycle[root.phase][2]
-                const frame = cycle[root.phase]
-                root.offsetX = frame[0] / root.scaleFactor
-                root.offsetY = frame[1] / root.scaleFactor
+            const step = root.runtime.poll(now, root.active ? "" : "paused", force, Policy.cycles[root.radius])
+            if (step.restore) {
+                root.offsetX = 0
+                root.offsetY = 0
+            }
+            if (step.offset) {
+                root.offsetX = step.offset[0] / root.scaleFactor
+                root.offsetY = step.offset[1] / root.scaleFactor
             }
         }
     }

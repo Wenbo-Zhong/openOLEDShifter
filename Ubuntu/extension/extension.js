@@ -7,6 +7,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as LoginManager from 'resource:///org/gnome/shell/misc/loginManager.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {cycles, scheduleTransitions} from './cycles.js';
+import {createShiftRuntime} from './shift-runtime.js';
 import {WallpaperTranslations} from './translation.js';
 
 const desktopInterface = `<node>
@@ -39,6 +40,7 @@ export default class OpenOLEDShifter extends Extension {
         this._requested = this._settings.get_boolean('start-at-login');
         this._timer = 0;
         this._translations = new WallpaperTranslations();
+        this._runtime = createShiftRuntime(scheduleTransitions);
 
 
         for (const [object, signal] of [
@@ -156,44 +158,28 @@ export default class OpenOLEDShifter extends Extension {
     _poll(force = false) {
         const target = this._availability();
         const reason = typeof target === 'string' ? target : '';
-        const now = GLib.get_monotonic_time();
-        // The bit order and transition table come from the shared core.
-        const flags = (reason ? 1 : 0)
-            | (reason !== this._pauseReason ? 2 : 0)
-            | (this._pauseReason ? 4 : 0)
-            | (now >= this._due ? 8 : 0)
-            | (force ? 16 : 0);
-        const decision = scheduleTransitions[flags];
-        this._pauseReason = reason;
-        if (decision.ResetDeadline)
-            this._due = now + this._interval;
-        if (decision.Restore) {
+        const cycle = cycles[this._settings.get_int('radius')];
+        const step = this._runtime.poll(GLib.get_monotonic_time() / 1000, reason, force, cycle,
+            !reason && !this._translations.matches(target));
+        if (step.restore)
             this._translations.release();
-            this._phase = 0;
-        }
         if (reason) {
             this._setStatus(reason);
             return;
         }
-        if (decision.Shift)
-            this._shift(target);
+        if (step.offset)
+            this._shift(target, step.offset);
         else if (this._translations.empty)
             this._setStatus('Waiting for the next wallpaper shift');
     }
 
-    _shift(target) {
-        if (!this._translations.matches(target))
-            this._phase = 0;
-        const cycle = cycles[this._settings.get_int('radius')];
-        const next = cycle[this._phase][2];
-        const [x, y] = cycle[next];
+    _shift(target, [x, y]) {
         if (!this._translations.shift(target, x, y)) {
             this._setStatus('Paused: another component moved the wallpaper');
             return;
         }
 
         this._setStatus(`Wallpaper offset: ${x}, ${y} physical px`);
-        this._phase = next;
     }
 
     _stop() {
@@ -211,10 +197,8 @@ export default class OpenOLEDShifter extends Extension {
             return;
         }
 
-        this._phase = 0;
-        this._interval = this._settings.get_int('interval-seconds') * 1_000_000;
-        this._pauseReason = '';
-        this._due = GLib.get_monotonic_time() + this._interval;
+        this._runtime.reset(GLib.get_monotonic_time() / 1000,
+            this._settings.get_int('interval-seconds') * 1000);
         this._poll();
         this._timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
             this._poll();

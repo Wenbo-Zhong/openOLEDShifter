@@ -91,3 +91,6 @@
 "Save applies to all displays already using OpenOLEDShifter. Choose images per screen in Plasma wallpaper settings."	"儲存會套用到所有已選用 OpenOLEDShifter 的螢幕。請在 Plasma 桌布設定中為各螢幕選圖。"
 "Could not update the Plasma wallpaper settings."	"無法更新 Plasma 桌布設定。"
 "Start KDE tray at login"	"登入 KDE 時啟動系統匣"
+"Open Plasma wallpaper settings"	"開啟 Plasma 桌布設定"
+"Open wallpaper settings from the Plasma desktop menu."	"請從 Plasma 桌面右鍵選單開啟桌布設定。"
+"After signing back in, open OpenOLEDShifter and click Enable wallpaper extension."	"重新登入後開啟 OpenOLEDShifter，點選「啟用桌布位移擴充功能」。"

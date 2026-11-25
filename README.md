@@ -58,10 +58,10 @@ sudo apt remove openoledshifter
 
 KDE 使用独立的 **OpenOLEDShifter 壁纸插件**。它适配 Plasma 6 的壁纸层，沿用 Windows 和 GNOME 共同的位移轨迹、默认设置和调度规则。每个显示器可在 Plasma 壁纸设置中单独选择和配置。插件只移动自己绘制的本地静态图片，桌面图标、面板和窗口位移暂不支持。
 
-在仓库根目录运行 `./build-plasma.sh`，生成 `release/ubuntu/openoledshifter-plasma.zip`。也可从 Linux 流水线的 Artifacts 下载。若已安装新 DEB 或 RPM，可直接去 Plasma 壁纸设置选用插件。只安装 ZIP 时，解压到当前用户的目录：
+在仓库根目录运行 `./build-plasma.sh`，生成 `release/ubuntu/openoledshifter-plasma.zip`。也可从 Linux 流水线的 Artifacts 下载。若已安装新 DEB 或 RPM，应用会检测系统自带的插件，并提供「打开 Plasma 壁纸设置」入口。选择壁纸类型后再启用位移。只安装 ZIP 时，解压到当前用户的壁纸目录。新版 ZIP 自带插件目录层级：
 
 ```bash
-plugin="${XDG_DATA_HOME:-$HOME/.local/share}/plasma/wallpapers/org.openoledshifter.wallpaper"
+plugin="${XDG_DATA_HOME:-$HOME/.local/share}/plasma/wallpapers/"
 mkdir -p "$plugin"
 unzip -o ./release/ubuntu/openoledshifter-plasma.zip -d "$plugin"
 ```

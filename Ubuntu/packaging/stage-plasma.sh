@@ -9,3 +9,4 @@ cp LICENSE "$destination/"
 # QML imports plain JavaScript, while GJS imports an ES module.
 sed -e '/^export const translations/,$d' -e 's/^export const /var /' \
     "$policy" >"$destination/contents/ui/policy.js"
+sed 's/^export function /function /' Ubuntu/shared/shift-runtime.js >"$destination/contents/ui/shift-runtime.js"

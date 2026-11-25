@@ -54,8 +54,7 @@ bool extension_installed() {
             throw std::runtime_error("Wallpaper extension files are missing. Reinstall the OpenOLEDShifter package.");
         throw std::runtime_error(
             "The wallpaper extension is installed but not loaded in this session. Save your work, sign out, and sign back in.\n"
-            "Then run this command as your desktop user and reopen OpenOLEDShifter.\n"
-            "gnome-extensions enable openoledshifter@openoledshifter");
+            "After signing back in, open OpenOLEDShifter and click Enable wallpaper extension.");
     }
 
     gboolean enabled = FALSE;
@@ -153,8 +152,18 @@ class PlasmaBackend final : public Backend {
     const char* failure_hint() const override { return "Set up the Plasma wallpaper plugin"; }
     DesktopFeatures features() const override { return {.fullscreen_pause = true}; }
     const char* login_label() const override { return "Start KDE tray at login"; }
+    const char* setup_label() const override { return "Open Plasma wallpaper settings"; }
 
     State call(Command command, const Settings& requested) override {
+        if (command == Command::Setup) {
+            if (plasma_wallpaper_installed()) {
+                g_autoptr(GSubprocess) settings = g_subprocess_new(G_SUBPROCESS_FLAGS_NONE, nullptr,
+                    "systemsettings", "kcm_wallpaper", nullptr);
+                if (!settings)
+                    throw std::runtime_error("Open wallpaper settings from the Plasma desktop menu.");
+            }
+            return call(Command::Read, {});
+        }
         if (command != Command::Read && command != Command::Apply &&
             command != Command::Pause && command != Command::Toggle && command != Command::Shift)
             return {};
@@ -162,7 +171,7 @@ class PlasmaBackend final : public Backend {
             throw std::runtime_error(
                 std::string("Use the openoledshifter-plasma.zip package.\n") +
                 "Extract the archive into the following folder. Create it if needed.\n"
-                + g_get_user_data_dir() + "/plasma/wallpapers/org.openoledshifter.wallpaper\n"
+                + g_get_user_data_dir() + "/plasma/wallpapers/\n"
                 "Then reopen this window to check the installation.");
 
         std::unique_ptr<GDBusConnection, decltype(&g_object_unref)> connection(

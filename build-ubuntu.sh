@@ -46,8 +46,12 @@ cmake --build "$stage/native-build" --parallel
 ctest --test-dir "$stage/native-build" --output-on-failure
 "$stage/native-build/generate_policy" \
     "Ubuntu/extension/schemas/$schema.in" "$extension/schemas/$schema" "$extension/cycles.js"
+install -m 0644 Ubuntu/shared/shift-runtime.js "$extension/shift-runtime.js"
 glib-compile-schemas --strict "$extension/schemas"
 gjs -m "$extension/cycles.js"
+cp Ubuntu/shared/shift-runtime-test.js "$extension/"
+gjs -m "$extension/shift-runtime-test.js"
+rm "$extension/shift-runtime-test.js"
 gjs -m Ubuntu/translation-test.js
 desktop-file-validate "$stage/usr/share/applications/$desktop_id.desktop"
 
@@ -59,7 +63,11 @@ for source in "$extension" "$plasma"; do
     else
         bundle=openoledshifter-plasma.zip
     fi
-    (cd "$source" && zip -qr "$stage/$bundle" .)
+    if [[ "$source" == "$plasma" ]]; then
+        (cd "$(dirname "$source")" && zip -qr "$stage/$bundle" "$(basename "$source")")
+    else
+        (cd "$source" && zip -qr "$stage/$bundle" .)
+    fi
     mv "$stage/$bundle" "$output/"
 done
 

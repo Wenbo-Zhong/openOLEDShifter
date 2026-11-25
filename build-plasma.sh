@@ -9,8 +9,8 @@ cmake --build "$stage/build" --parallel
 ctest --test-dir "$stage/build" --output-on-failure
 "$stage/build/generate_policy" Ubuntu/extension/schemas/org.gnome.shell.extensions.openoledshifter.gschema.xml.in \
     "$stage/schema.xml" "$stage/cycles.js"
-bash Ubuntu/packaging/stage-plasma.sh "$stage/cycles.js" "$stage/plugin"
+bash Ubuntu/packaging/stage-plasma.sh "$stage/cycles.js" "$stage/org.openoledshifter.wallpaper"
 mkdir -p release/ubuntu
-(cd "$stage/plugin" && zip -qr "$stage/openoledshifter-plasma.zip" .)
+(cd "$stage" && zip -qr "$stage/openoledshifter-plasma.zip" org.openoledshifter.wallpaper)
 mv "$stage/openoledshifter-plasma.zip" release/ubuntu/
 printf 'Ready: release/ubuntu/openoledshifter-plasma.zip\n'
