@@ -11,7 +11,17 @@ Set-Location -LiteralPath $PSScriptRoot
 if ($WxSource) {
     $arguments = @('-S', 'NativeApp', '-B', $BuildDirectory, '-DOPENOLED_BUILD_UI=ON',
         '-DCMAKE_BUILD_TYPE=Release', "-DOPENOLED_WX_SOURCE=$((Resolve-Path -LiteralPath $WxSource).Path)")
-    if (!(Test-Path (Join-Path $BuildDirectory 'CMakeCache.txt'))) { $arguments += @('-A', 'x64') }
+    if (!(Test-Path (Join-Path $BuildDirectory 'CMakeCache.txt'))) {
+        $generator = $env:CMAKE_GENERATOR
+        if (!$generator) {
+            $cmakeHelp = cmake --help
+            if ($LASTEXITCODE) { throw 'Cannot determine the default CMake generator' }
+            $defaultGenerator = $cmakeHelp | Select-String -Pattern '^\*\s+(.+?)\s+='
+            if (!$defaultGenerator) { throw 'Cannot determine the default CMake generator' }
+            $generator = $defaultGenerator.Matches[0].Groups[1].Value
+        }
+        if ($generator -like 'Visual Studio *') { $arguments += @('-A', 'x64') }
+    }
     cmake @arguments
     if ($LASTEXITCODE) { throw 'CMake configuration failed' }
 } elseif (!(Test-Path (Join-Path $BuildDirectory 'CMakeCache.txt'))) {

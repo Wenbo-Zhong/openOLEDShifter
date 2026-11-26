@@ -111,6 +111,8 @@ unzip -o ./release/ubuntu/openoledshifter-plasma.zip -d "$plugin"
 
 构建脚本运行 CTest 并将 EXE 和许可证放到 `release/windows-x64`。
 
+首次配置遵循 `CMAKE_GENERATOR`，未设置时使用 CMake 默认生成器。Visual Studio 自动选择 x64；使用 Ninja 或 MinGW 时，请先准备好 x64 编译器环境。
+
 ## 开源与贡献
 
 代码、图标及项目文档以 **GPL-3.0-only** 发布，完整条款见 `LICENSE`。wxWidgets 保留其独立许可证。图标生成脚本需要 Pillow，但生成的图标已提交，正常构建不需要安装 Python/Pillow。
