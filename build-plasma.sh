@@ -7,9 +7,9 @@ trap 'rm -rf -- "$stage"' EXIT
 cmake -S NativeApp -B "$stage/build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$stage/build" --parallel
 ctest --test-dir "$stage/build" --output-on-failure
-"$stage/build/generate_policy" Ubuntu/extension/schemas/org.gnome.shell.extensions.openoledshifter.gschema.xml.in \
+"$stage/build/generate_policy" Linux/extension/schemas/org.gnome.shell.extensions.openoledshifter.gschema.xml.in \
     "$stage/schema.xml" "$stage/cycles.js"
-bash Ubuntu/packaging/stage-plasma.sh "$stage/cycles.js" "$stage/org.openoledshifter.wallpaper"
+bash Linux/packaging/stage-plasma.sh "$stage/cycles.js" "$stage/org.openoledshifter.wallpaper"
 mkdir -p release/ubuntu
 (cd "$stage" && zip -qr "$stage/openoledshifter-plasma.zip" org.openoledshifter.wallpaper)
 mv "$stage/openoledshifter-plasma.zip" release/ubuntu/

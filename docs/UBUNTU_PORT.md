@@ -23,10 +23,11 @@ Windows 位移后端使用 Win32、COM 和 GDI+。Windows 和 Linux 共用 C++ �
 
 ## 已实现
 
-- `NativeApp/` 保存共享默认参数、轨迹、调度规则和设置契约。构建工具为 GNOME 和 Plasma 生成插件数据。
+- `NativeApp/core/` 保存共享默认参数、轨迹和调度规则，`NativeApp/app/` 保存设置契约、命令队列和界面。`NativeApp/tools/` 的构建工具为 GNOME 和 Plasma 生成插件数据；桌面专用后端位于 `NativeApp/platform/linux/`。
+- `Linux/extension/` 和 `Linux/plasma-wallpaper/` 保存桌面插件，共用 `Linux/shared/` 的位移运行时。`Linux/packaging/` 保存打包资源；Ubuntu 构建入口仍是根目录的 `build-ubuntu.sh`。
 - GNOME Shell 扩展只操作桌面壁纸 actor。物理偏移除以各显示器的缩放系数后写入逻辑坐标。位移以零平移为基准。扩展只在实际平移仍匹配最后写入值时恢复，遇到其他组件改变平移时暂停该 actor。GNOME 更换壁纸时使用新 actor。
 - 扩展在写入前记录恢复意图。该记录与图层状态都位于 Shell 进程内，退出或崩溃时由 compositor 一并销毁。壁纸设置和源文件无需持久化恢复。
-- 顶部面板可按会话启停。两端共用 `NativeApp/` 中的 wxWidgets 设置窗口和输入校验。Ubuntu 窗口通过会话 D-Bus 读取状态并提交设置，GNOME 扩展负责调度与位移。扩展停用时释放 D-Bus 对象、定时器、监听器和图层平移。
+- 顶部面板可按会话启停。两端共用 `NativeApp/app/` 中的 wxWidgets 设置窗口和输入校验。Ubuntu 窗口通过会话 D-Bus 读取状态并提交设置，GNOME 扩展负责调度与位移。扩展停用时释放 D-Bus 对象、定时器、监听器和图层平移。
 
 ## 验证环境
 

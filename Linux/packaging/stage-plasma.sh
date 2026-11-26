@@ -4,9 +4,9 @@ set -euo pipefail
 policy=$1
 destination=$2
 mkdir -p "$destination"
-cp -a Ubuntu/plasma-wallpaper/. "$destination/"
+cp -a Linux/plasma-wallpaper/. "$destination/"
 cp LICENSE "$destination/"
 # QML imports plain JavaScript, while GJS imports an ES module.
 sed 's/^export const /var /' \
     "$policy" >"$destination/contents/ui/policy.js"
-sed 's/^export function /function /' Ubuntu/shared/shift-runtime.js >"$destination/contents/ui/shift-runtime.js"
+sed 's/^export function /function /' Linux/shared/shift-runtime.js >"$destination/contents/ui/shift-runtime.js"

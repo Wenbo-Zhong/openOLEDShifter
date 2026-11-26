@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
-#include "shift_core.hpp"
+#include "core/shift_core.hpp"
 
 #include <cstdlib>
 #include <iostream>

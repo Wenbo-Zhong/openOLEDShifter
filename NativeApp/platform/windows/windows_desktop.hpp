@@ -2,7 +2,7 @@
 // Copyright (c) 2026 OpenOLEDShifter contributors
 #pragma once
 
-#include "shift_core.hpp"
+#include "core/shift_core.hpp"
 #include <filesystem>
 #include <windows.h>
 

@@ -10,6 +10,8 @@
 #include <windows.h>
 
 namespace oled::win {
+std::filesystem::path data_root();
+
 inline void atomic_write(const std::filesystem::path& file, std::span<const std::byte> bytes) {
     if (bytes.size() > (std::numeric_limits<DWORD>::max)())
         throw std::length_error("File is too large");

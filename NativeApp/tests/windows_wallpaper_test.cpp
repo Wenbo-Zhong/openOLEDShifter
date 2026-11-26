@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
-#include "windows_wallpaper.hpp"
-#include "windows_displays.hpp"
+#include "platform/windows/windows_wallpaper.hpp"
+#include "platform/windows/windows_displays.hpp"
 
 #include <cstring>
 #include <fstream>

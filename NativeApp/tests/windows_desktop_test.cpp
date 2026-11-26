@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
-#include "windows_desktop.hpp"
-#include "windows_app_windows.hpp"
+#include "platform/windows/windows_desktop.hpp"
+#include "platform/windows/windows_app_windows.hpp"
 
 #include <iostream>
 #include <shellapi.h>

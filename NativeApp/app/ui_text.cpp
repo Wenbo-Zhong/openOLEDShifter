@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "ui_text.hpp"
-#include "localization.hpp"
+#include "core/localization.hpp"
 #include <string>
 #ifdef _WIN32
 #include <windows.h>

@@ -15,6 +15,16 @@
 
 namespace oled::win {
 namespace fs = std::filesystem;
+std::wstring join_processes(const std::vector<std::wstring>& processes) {
+    std::wstring names;
+    for (const auto& process : processes) {
+        if (!names.empty())
+            names += L", ";
+        names += process;
+    }
+    return names;
+}
+
 namespace {
 constexpr DWORD open_query = PROCESS_QUERY_LIMITED_INFORMATION;
 constexpr std::wstring_view prefix = L"app-window-", suffix = L".recovery";

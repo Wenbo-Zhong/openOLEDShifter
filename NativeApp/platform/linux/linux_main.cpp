@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
-#include "settings_frame.hpp"
-#include "ui_text.hpp"
+#include "app/settings_frame.hpp"
+#include "app/ui_text.hpp"
 #include <libayatana-appindicator/app-indicator.h>
 #include <wx/app.h>
 #include <wx/frame.h>

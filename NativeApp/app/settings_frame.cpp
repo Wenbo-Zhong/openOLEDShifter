@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 OpenOLEDShifter contributors
-#include "settings_backend.hpp"
+#include "settings_commands.hpp"
 #include "settings_frame.hpp"
-#include <deque>
 #include "ui_text.hpp"
 
 #include <wx/wx.h>
@@ -11,7 +10,6 @@
 #include <wx/scrolwin.h>
 #include <wx/wrapsizer.h>
 #include <algorithm>
-#include <future>
 #include <utility>
 
 namespace {
@@ -169,17 +167,14 @@ public:
     }
 
     void send_from_tray(Command command, bool close_after) {
-        tray_commands_.emplace_back(command, close_after);
+        commands_.enqueue_tray(command, close_after);
         dispatch_tray_command();
     }
 
 private:
     void dispatch_tray_command() {
-        if (pending_.valid() || tray_commands_.empty())
-            return;
-        const auto [command, close_after] = tray_commands_.front();
-        tray_commands_.pop_front();
-        begin(command, true, close_after);
+        if (auto request = commands_.next_tray_command())
+            begin(*request);
     }
 
     void mark_dirty() {
@@ -203,11 +198,11 @@ private:
         if (setup_) {
             if (setup_->Show(!connected_))
                 panel_->Layout();
-            setup_->Enable(!pending_.valid());
+            setup_->Enable(!commands_.busy());
         }
         for (auto* button : buttons_)
-            button->Enable(connected_ && !pending_.valid());
-        const bool editable = connected_ && (!pending_.valid() || command_ == Command::Read);
+            button->Enable(connected_ && !commands_.busy());
+        const bool editable = connected_ && (!commands_.busy() || commands_.current().command == Command::Read);
         enabled_->Enable(editable);
         login_->Enable(editable);
         interval_->Enable(editable);
@@ -220,12 +215,13 @@ private:
             control->Enable(editable);
     }
 
-    void begin(Command command, bool from_tray = false, bool close_after = false) {
-        if (pending_.valid())
+    void begin(Command command) {
+        begin(CommandRequest{command});
+    }
+
+    void begin(CommandRequest request) {
+        if (commands_.busy())
             return;
-        command_ = command;
-        from_tray_ = from_tray;
-        close_after_ = close_after;
         Settings settings{interval_->GetValue(), radius_->GetValue(),
                           enabled_->GetValue(), login_->GetValue()};
         for (const auto& [control, value] : options_)
@@ -233,28 +229,19 @@ private:
         settings.wallpaper_display = selected_display();
         if (processes_)
             settings.window_processes = processes_->GetValue().ToStdString(wxConvUTF8);
-        if (desktop_backend().use_worker()) {
-            pending_ = std::async(std::launch::async, [command, settings] {
-                return desktop_backend().call(command, settings);
-            });
+        if (auto result = commands_.begin(request, settings))
+            complete(std::move(*result));
+        else
             controls();
-        } else {
-            complete([command, settings] { return desktop_backend().call(command, settings); });
-        }
     }
 
     void poll() {
-        using namespace std::chrono_literals;
-        if (!pending_.valid()) {
-            if (!tray_commands_.empty())
-                dispatch_tray_command();
-            else if (Schedule::Clock::now() >= next_read_)
-                begin(Command::Read);
-            return;
+        if (commands_.busy()) {
+            if (auto result = commands_.poll())
+                complete(std::move(*result));
+        } else if (auto request = commands_.next_command(Schedule::Clock::now())) {
+            begin(*request);
         }
-        if (pending_.wait_for(0ms) != std::future_status::ready)
-            return;
-        complete([this] { return pending_.get(); });
     }
 
     std::string selected_display() const {
@@ -280,14 +267,16 @@ private:
             display_->SetSelection(static_cast<int>(index));
     }
 
-    template<class ReadState>
-    void complete(ReadState read_state) {
+    void complete(CommandResult result) {
         try {
-            auto state = read_state();
+            if (result.error)
+                std::rethrow_exception(result.error);
+            auto& state = result.state;
             connected_ = true;
             if (immediate_startup_)
                 login_->SetValue(state.settings.login);
-            if (!dirty_ || (!from_tray_ && (command_ == Command::Apply || command_ == Command::Pause))) {
+            if (!dirty_ || (!result.request.from_tray &&
+                           (result.request.command == Command::Apply || result.request.command == Command::Pause))) {
                 enabled_->SetValue(state.settings.enabled);
                 login_->SetValue(state.settings.login);
                 interval_->SetValue(state.settings.interval);
@@ -320,10 +309,9 @@ private:
                 SetSize(size.x, std::min(work.height, size.y + missing));
         }
 #endif
-        next_read_ = Schedule::Clock::now() + std::chrono::seconds(3);
+        commands_.completed(result.request, Schedule::Clock::now());
         controls();
-        if (close_after_) {
-            tray_commands_.clear();
+        if (result.request.close_after) {
             CallAfter([this] { Close(true); });
         }
     }
@@ -375,12 +363,7 @@ private:
     std::vector<DisplayChoice> displays_;
     std::vector<wxButton*> buttons_;
     std::vector<std::pair<wxCheckBox*, bool Settings::*>> options_;
-    std::future<State> pending_;
-    std::deque<std::pair<Command, bool>> tray_commands_;
-    bool from_tray_ = false;
-    bool close_after_ = false;
-    Schedule::Clock::time_point next_read_;
-    Command command_ = Command::Read;
+    SettingsCommands commands_{desktop_backend()};
 #ifdef __WXGTK__
     bool initial_status_fitted_ = false;
 #endif

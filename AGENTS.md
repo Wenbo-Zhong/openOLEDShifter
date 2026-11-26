@@ -16,9 +16,12 @@ This project is GPL-3.0-only. Keep compatible licensing and the source notices. 
 
 ## Implementation boundaries
 
-- `NativeApp/`: shared C++ policy, wxWidgets settings and tray, platform backends, and native tests.
-- `Ubuntu/extension/`, `Ubuntu/plasma-wallpaper/`: compositor-specific wallpaper integrations.
-- `Ubuntu/shared/`: common Linux shift runtime.
+- `NativeApp/core/`: shared C++ policy and localization without desktop dependencies.
+- `NativeApp/app/`: shared settings contract, command execution/queue, wxWidgets settings and UI text.
+- `NativeApp/platform/windows/`, `NativeApp/platform/linux/`: platform entry points, tray and system operations.
+- `NativeApp/tests/`, `NativeApp/tools/`: native tests and desktop policy generator.
+- `Linux/extension/`, `Linux/plasma-wallpaper/`: compositor-specific wallpaper integrations.
+- `Linux/shared/`, `Linux/packaging/`: common Linux shift runtime and packaging resources.
 - `translations/`: shared language files.
 - `assets/`: project icon and generator. Keep the existing icon unless requested.
 

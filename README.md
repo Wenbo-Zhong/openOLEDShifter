@@ -4,7 +4,7 @@
 
 **Windows x64** 提供托盘和桌面位移功能。**Ubuntu 26.04 的 GNOME 50 Wayland** 提供壁纸位移扩展，支持多屏及整数、125% 和 150% 缩放。两端默认使用 200 秒间隔和九点往返轨迹。
 
-Windows 和 Ubuntu 默认发布 **C++ + wxWidgets** 原生版。[架构与迁移状态](docs/ARCHITECTURE.md)
+Windows 和 Ubuntu 默认发布 **C++ + wxWidgets** 原生版。`NativeApp/` 按共享核心、应用、平台后端、测试和工具组织；Linux 桌面插件及打包资源位于 `Linux/`。[架构与迁移状态](docs/ARCHITECTURE.md)
 
 原生界面跟随系统语言和浅色／深色偏好。简体中文、繁体中文和英文可自动识别，其他语言使用英文。设置窗口支持高 DPI 和滚动布局。
 

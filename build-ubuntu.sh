@@ -35,8 +35,8 @@ trap 'rm -rf -- "$stage"; if [[ -n "$temporary" ]]; then rm -f -- "$temporary"; 
 app="$stage/usr/lib/$name"
 extension="$stage/usr/share/gnome-shell/extensions/$uuid"
 install -d "$extension/schemas"
-install -m 0644 Ubuntu/extension/{extension,translation}.js Ubuntu/extension/metadata.json "$extension/"
-install -Dm0644 "Ubuntu/packaging/$desktop_id.desktop" "$stage/usr/share/applications/$desktop_id.desktop"
+install -m 0644 Linux/extension/{extension,translation}.js Linux/extension/metadata.json "$extension/"
+install -Dm0644 "Linux/packaging/$desktop_id.desktop" "$stage/usr/share/applications/$desktop_id.desktop"
 install -Dm0644 assets/app-icon.png "$stage/usr/share/icons/hicolor/512x512/apps/$desktop_id.png"
 install -Dm0644 LICENSE "$stage/usr/share/doc/$name/copyright"
 
@@ -45,18 +45,18 @@ cmake -S NativeApp -B "$stage/native-build" -DCMAKE_BUILD_TYPE=Release -DOPENOLE
 cmake --build "$stage/native-build" --parallel
 ctest --test-dir "$stage/native-build" --output-on-failure
 "$stage/native-build/generate_policy" \
-    "Ubuntu/extension/schemas/$schema.in" "$extension/schemas/$schema" "$extension/cycles.js"
-install -m 0644 Ubuntu/shared/shift-runtime.js "$extension/shift-runtime.js"
+    "Linux/extension/schemas/$schema.in" "$extension/schemas/$schema" "$extension/cycles.js"
+install -m 0644 Linux/shared/shift-runtime.js "$extension/shift-runtime.js"
 glib-compile-schemas --strict "$extension/schemas"
 gjs -m "$extension/cycles.js"
-cp Ubuntu/shared/shift-runtime-test.js "$extension/"
+cp Linux/shared/shift-runtime-test.js "$extension/"
 gjs -m "$extension/shift-runtime-test.js"
 rm "$extension/shift-runtime-test.js"
-gjs -m Ubuntu/translation-test.js
+gjs -m Linux/translation-test.js
 desktop-file-validate "$stage/usr/share/applications/$desktop_id.desktop"
 
 plasma="$stage/usr/share/plasma/wallpapers/org.openoledshifter.wallpaper"
-bash Ubuntu/packaging/stage-plasma.sh "$extension/cycles.js" "$plasma"
+bash Linux/packaging/stage-plasma.sh "$extension/cycles.js" "$plasma"
 for source in "$extension" "$plasma"; do
     if [[ "$source" == "$extension" ]]; then
         bundle="$uuid.shell-extension.zip"
@@ -106,7 +106,7 @@ build_rpm() {
         --define "_topdir $topdir" \
         --define "package_version $version" \
         --define "payload $stage" \
-        Ubuntu/packaging/openoledshifter.spec
+        Linux/packaging/openoledshifter.spec
     local filename="$name-$version-1.$rpm_arch.rpm"
     mv -f -- "$topdir/RPMS/$rpm_arch/$filename" "$output/$filename"
     printf 'Ready: %s\n' "$output/$filename"

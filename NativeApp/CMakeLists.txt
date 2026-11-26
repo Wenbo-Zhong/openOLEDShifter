@@ -32,11 +32,17 @@ foreach(path IN LISTS locale_files)
 endforeach()
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/translation_catalog.inc" CONTENT "@catalog@" @ONLY)
 target_include_directories(shift_core INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
-add_executable(generate_policy generate_policy.cpp)
+add_executable(generate_policy tools/generate_policy.cpp)
 target_link_libraries(generate_policy PRIVATE shift_core)
 
+find_package(Threads REQUIRED)
+add_library(settings_commands app/settings_commands.cpp)
+target_link_libraries(settings_commands PUBLIC shift_core Threads::Threads)
+
 if(WIN32)
-    add_library(windows_desktop windows_app_windows.cpp windows_desktop.cpp windows_displays.cpp windows_wallpaper.cpp)
+    add_library(windows_desktop
+        platform/windows/windows_app_windows.cpp platform/windows/windows_desktop.cpp
+        platform/windows/windows_displays.cpp platform/windows/windows_wallpaper.cpp)
     target_compile_definitions(windows_desktop PUBLIC NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
     target_link_libraries(windows_desktop PUBLIC shift_core ole32 uuid gdiplus shell32 dwmapi)
 endif()
@@ -56,8 +62,14 @@ if(OPENOLED_BUILD_UI)
     else()
         find_package(wxWidgets CONFIG REQUIRED COMPONENTS core base)
     endif()
-    add_executable(OpenOLEDShifter WIN32 settings.cpp ui_text.cpp windows_main.cpp windows_backend.cpp windows_resources.rc)
-    target_link_libraries(OpenOLEDShifter PRIVATE windows_desktop wx::core wtsapi32 advapi32)
+    add_executable(OpenOLEDShifter WIN32 app/settings_frame.cpp app/ui_text.cpp
+        platform/windows/windows_main.cpp platform/windows/windows_backend.cpp
+        platform/windows/windows_config.cpp platform/windows/windows_startup.cpp
+        platform/windows/windows_resources.rc)
+    # Resolve icon paths from the resource directory with both MSVC and windres.
+    target_include_directories(OpenOLEDShifter PRIVATE
+        "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}/platform/windows>")
+    target_link_libraries(OpenOLEDShifter PRIVATE settings_commands windows_desktop wx::core wtsapi32 advapi32)
     if(MINGW)
         target_link_options(OpenOLEDShifter PRIVATE -static)
     elseif(MSVC)
@@ -67,28 +79,32 @@ if(OPENOLED_BUILD_UI)
     find_package(wxWidgets REQUIRED COMPONENTS core base)
     include(${wxWidgets_USE_FILE})
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GNOME REQUIRED IMPORTED_TARGET gio-2.0 gio-unix-2.0 json-glib-1.0 gtk+-3.0 ayatana-appindicator3-0.1)
-    find_package(Threads REQUIRED)
-    add_executable(OpenOLEDShifter settings.cpp ui_text.cpp gnome_main.cpp gnome_backend.cpp)
-    target_link_libraries(OpenOLEDShifter PRIVATE shift_core ${wxWidgets_LIBRARIES}
-        PkgConfig::GNOME Threads::Threads)
+    pkg_check_modules(LINUX_DESKTOP REQUIRED IMPORTED_TARGET gio-2.0 gio-unix-2.0 json-glib-1.0 gtk+-3.0 ayatana-appindicator3-0.1)
+    add_executable(OpenOLEDShifter app/settings_frame.cpp app/ui_text.cpp
+        platform/linux/linux_main.cpp platform/linux/linux_backend.cpp
+        platform/linux/gnome_backend.cpp platform/linux/plasma_backend.cpp)
+    target_link_libraries(OpenOLEDShifter PRIVATE settings_commands ${wxWidgets_LIBRARIES}
+        PkgConfig::LINUX_DESKTOP)
   else()
-    message(FATAL_ERROR "The native settings app requires Windows or GNOME on Linux")
+    message(FATAL_ERROR "The native settings app requires Windows or GNOME/Plasma on Linux")
   endif()
 endif()
 
 if(BUILD_TESTING)
-    add_executable(shift_core_test core_test.cpp)
+    add_executable(shift_core_test tests/core_test.cpp)
     target_link_libraries(shift_core_test PRIVATE shift_core)
     add_test(NAME shift_core COMMAND shift_core_test)
+    add_executable(settings_commands_test tests/settings_commands_test.cpp)
+    target_link_libraries(settings_commands_test PRIVATE settings_commands)
+    add_test(NAME settings_commands COMMAND settings_commands_test)
     add_test(NAME translation_catalog COMMAND generate_policy
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Ubuntu/extension/schemas/org.gnome.shell.extensions.openoledshifter.gschema.xml.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Linux/extension/schemas/org.gnome.shell.extensions.openoledshifter.gschema.xml.in"
         "${CMAKE_CURRENT_BINARY_DIR}/test-schema.xml" "${CMAKE_CURRENT_BINARY_DIR}/test-cycles.js")
     if(WIN32)
-        add_executable(windows_wallpaper_test windows_wallpaper_test.cpp)
+        add_executable(windows_wallpaper_test tests/windows_wallpaper_test.cpp)
         target_link_libraries(windows_wallpaper_test PRIVATE windows_desktop)
         add_test(NAME windows_wallpaper COMMAND windows_wallpaper_test)
-        add_executable(windows_desktop_test windows_desktop_test.cpp)
+        add_executable(windows_desktop_test tests/windows_desktop_test.cpp)
         target_link_libraries(windows_desktop_test PRIVATE windows_desktop)
         add_test(NAME windows_desktop COMMAND windows_desktop_test)
     endif()
