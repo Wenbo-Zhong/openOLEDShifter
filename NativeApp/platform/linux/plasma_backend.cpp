@@ -45,7 +45,7 @@ class PlasmaBackend final : public Backend {
         unsigned selected = 0, enabled = 0;
         Settings first;
         first.login = linux_desktop::autostart_enabled(linux_desktop::Desktop::Plasma);
-        // Plasma screen IDs can have gaps after disconnecting a display.
+        // 热插拔后 Plasma 的屏幕 ID 可能不连续，不能把当前显示器数量当作 ID 上界。
         for (unsigned screen = 0; screen < 16; ++screen) {
             g_autoptr(GVariant) reply = g_dbus_connection_call_sync(connection, "org.kde.plasmashell", "/PlasmaShell",
                 "org.kde.PlasmaShell", "wallpaper", g_variant_new("(u)", screen),
@@ -54,6 +54,7 @@ class PlasmaBackend final : public Backend {
                 throw std::runtime_error("Could not read the current Plasma wallpaper settings.");
             g_autoptr(GVariant) fields = g_variant_get_child_value(reply, 0);
             const char* plugin = nullptr;
+            // 仅向查询时已经使用本插件的屏幕发命令，其他壁纸类型由用户在 Plasma 中选择。
             if (!g_variant_lookup(fields, "wallpaperPlugin", "&s", &plugin) ||
                 std::string_view(plugin) != plugin_id)
                 continue;
@@ -70,6 +71,7 @@ class PlasmaBackend final : public Backend {
             const bool has_image = g_variant_lookup(fields, "Image", "&s", &image) &&
                                    g_str_has_prefix(image, "file:///");
             if (command != Command::Read && (command != Command::Shift || (checked && has_image))) {
+                // Toggle 用首个匹配屏幕决定统一目标状态，避免各屏单独反转后仍不一致。
                 const bool next = command == Command::Apply ? requested.enabled :
                     command == Command::Toggle ? (selected == 0 ? !checked : first.enabled) :
                     command == Command::Shift ? static_cast<bool>(checked) : false;
@@ -110,6 +112,7 @@ class PlasmaBackend final : public Backend {
         if (selected && command != Command::Read) {
             if (command == Command::Apply)
                 linux_desktop::save_autostart(linux_desktop::Desktop::Plasma, requested.login);
+            // 写入后重读桌面实际配置，不能仅凭请求值向界面报告保存结果。
             return call(Command::Read, {});
         }
         if (selected)

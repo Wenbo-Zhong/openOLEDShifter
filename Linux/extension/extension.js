@@ -37,6 +37,7 @@ export default class OpenOLEDShifter extends Extension {
         this._interface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._login = LoginManager.getLoginManager();
         this._sleeping = false;
+        // 运行开关属于当前 Shell 会话，与“下次登录自动启用”的持久化设置分开。
         this._requested = this._settings.get_boolean('start-at-login');
         this._timer = 0;
         this._translations = new WallpaperTranslations();
@@ -159,6 +160,7 @@ export default class OpenOLEDShifter extends Extension {
         const target = this._availability();
         const reason = typeof target === 'string' ? target : '';
         const cycle = cycles[this._settings.get_int('radius')];
+        // GLib 返回单调时间的微秒值，运行时统一使用毫秒；换 actor 或缩放后重置轨迹相位。
         const step = this._runtime.poll(GLib.get_monotonic_time() / 1000, reason, force, cycle,
             !reason && !this._translations.matches(target));
         if (step.restore)
@@ -191,6 +193,7 @@ export default class OpenOLEDShifter extends Extension {
     }
 
     _restart() {
+        // 改配置或桌面目标时先释放旧定时器和仍拥有的平移，再开始新的完整计时周期。
         this._stop();
         if (!this._requested) {
             this._setStatus('Wallpaper shifting is off');

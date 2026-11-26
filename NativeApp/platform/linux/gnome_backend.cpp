@@ -51,6 +51,7 @@ bool extension_installed() {
         "gnome-extensions enable openoledshifter@openoledshifter");
 }
 
+// Shell 中加载的扩展版本可能与应用不同；响应必须校验字段类型和设置范围后才能进入共享状态。
 JsonNode* member(JsonObject* object, const char* key, GType type) {
     auto* value = json_object_get_member(object, key);
     if (!value || !JSON_NODE_HOLDS_VALUE(value) || json_node_get_value_type(value) != type)
@@ -99,6 +100,7 @@ class GnomeBackend final : public Backend {
         case Command::Toggle: method = "Toggle"; break;
         case Command::Apply:
             method = "ApplyOptions";
+            // 参数顺序与 Linux/extension/extension.js 的 D-Bus 声明和 ApplyOptions 方法保持一致。
             parameters = g_variant_new("(iibbb)", settings.interval, settings.radius,
                                        settings.enabled, settings.login, settings.pause_fullscreen);
             break;

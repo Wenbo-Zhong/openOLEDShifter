@@ -15,15 +15,19 @@
 namespace {
 using namespace oled;
 
+// 设置窗口负责控件、布局和编辑状态；系统操作交给 Backend，执行顺序交给 SettingsCommands。
 class SettingsFrame final : public wxFrame {
 public:
+    // 冒号后的列表先初始化基类窗口和成员；timer_(this) 让定时器向当前窗口发送事件。
     SettingsFrame() : wxFrame(nullptr, wxID_ANY, "OpenOLEDShifter"), timer_(this) {
+        // 控件通过父窗口建立归属并随父窗口销毁；Sizer 负责排布这些控件。
         panel_ = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL | wxTAB_TRAVERSAL);
         auto* panel = panel_;
         panel_->SetScrollRate(0, FromDIP(16));
         auto* layout = new wxBoxSizer(wxVERTICAL);
         auto* heading = new wxStaticText(panel, wxID_ANY, ui_text("OLED pixel shifting"));
         heading->SetFont(heading->GetFont().Larger().Larger().Bold());
+        // Add 的参数依次是控件、空间分配比例、对齐/边距标志和边距值；FromDIP 按屏幕缩放换算尺寸。
         layout->Add(heading, 0, wxALL, FromDIP(14));
         status_ = new wxStaticText(panel, wxID_ANY, status_text_);
         layout->Add(status_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(14));
@@ -34,8 +38,10 @@ public:
             layout->Add(setup_, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(14));
         }
 
+        // 根据当前桌面后端的实际能力创建选项，避免显示无法实现的功能。
         const auto features = desktop_backend().features();
         immediate_startup_ = features.immediate_startup;
+        // 调度和桌面目标分组共用这一层布局；wrap_labels() 会在窄窗口中改成上下排列。
         columns_ = new wxBoxSizer(wxHORIZONTAL);
         auto* timing = new wxStaticBoxSizer(wxVERTICAL, panel, ui_text("Schedule"));
         columns_->Add(timing, 1, wxEXPAND | wxALL, FromDIP(5));
@@ -95,6 +101,7 @@ public:
             layout->Add(applications, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(14));
         }
 
+        // 用“文案、命令”的映射统一创建操作按钮；宽度不足时允许按钮换行。
         auto* buttons = new wxWrapSizer(wxHORIZONTAL);
         for (const auto& [label, command] : {std::pair{"Save", Command::Apply},
                     {"Pause and restore", Command::Pause}, {"Shift once", Command::Shift}}) {
@@ -103,6 +110,7 @@ public:
             auto* button = new wxButton(panel, wxID_ANY, ui_text(label));
             if (command == Command::Apply)
                 button->SetDefault();
+            // Bind 注册点击回调；command 按值捕获，让每个按钮保留自己对应的命令。
             button->Bind(wxEVT_BUTTON, [this, command](wxCommandEvent&) { begin(command); });
             buttons->Add(button, 0, wxRIGHT, FromDIP(6));
             buttons_.push_back(button);
@@ -114,6 +122,7 @@ public:
             ui_text(desktop_backend().description()));
 
         layout->Add(note_, 0, wxEXPAND | wxALL, FromDIP(10));
+        // 内层布局管理面板内容，外层布局让可滚动面板填满窗口。
         panel->SetSizer(layout);
         auto* outer = new wxBoxSizer(wxVERTICAL);
         outer->Add(panel, 1, wxEXPAND);
@@ -133,6 +142,7 @@ public:
 #ifdef _WIN32
         Bind(wxEVT_DPI_CHANGED, [this](wxDPIChangedEvent& event) {
             event.Skip();
+            // 等当前 DPI 事件处理结束，再按新缩放重算滚动步长和文字换行。
             CallAfter([this] {
                 panel_->SetScrollRate(0, FromDIP(16));
                 wrap_width_ = 0;
@@ -143,6 +153,7 @@ public:
 
         enabled_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mark_dirty(); });
         login_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+            // 支持即时启动登记的后端立即提交；其他后端将此项作为待保存的设置。
             if (immediate_startup_)
                 begin(Command::SetStartup);
             else
@@ -162,11 +173,13 @@ public:
 #else
         SetSize(GetSize().x, std::min(work.y, content_height));
 #endif
+        // 每 100 毫秒检查命令结果；后端状态读取由命令队列限频，位移计时由桌面后端负责。
         timer_.Start(100);
         begin(Command::Read);
     }
 
     void send_from_tray(Command command, bool close_after) {
+        // 托盘请求进入同一队列，等待当前操作结束后执行，并保留请求来源用于合并编辑状态。
         commands_.enqueue_tray(command, close_after);
         dispatch_tray_command();
     }
@@ -184,6 +197,7 @@ private:
         }
     }
 
+    // bool Settings::* 是“Settings 的布尔字段”的成员指针，用来复用复选框的读写逻辑。
     void add_option(wxWindow* panel, wxBoxSizer* layout, bool supported,
                     const char* label, bool Settings::* value) {
         if (!supported)
@@ -202,6 +216,7 @@ private:
         }
         for (auto* button : buttons_)
             button->Enable(connected_ && !commands_.busy());
+        // 后台读状态时仍可编辑；修改后端的命令执行期间暂时禁用编辑，避免相互覆盖。
         const bool editable = connected_ && (!commands_.busy() || commands_.current().command == Command::Read);
         enabled_->Enable(editable);
         login_->Enable(editable);
@@ -222,6 +237,7 @@ private:
     void begin(CommandRequest request) {
         if (commands_.busy())
             return;
+        // 把当前控件值收集成设置快照；settings.*value 表示访问成员指针指定的字段。
         Settings settings{interval_->GetValue(), radius_->GetValue(),
                           enabled_->GetValue(), login_->GetValue()};
         for (const auto& [control, value] : options_)
@@ -236,6 +252,7 @@ private:
     }
 
     void poll() {
+        // 在 UI 线程消费已完成的结果，再执行排队请求或到期的状态读取。
         if (commands_.busy()) {
             if (auto result = commands_.poll())
                 complete(std::move(*result));
@@ -254,6 +271,7 @@ private:
         if (!display_)
             return;
         const auto match = [&](const auto& choice) { return choice.id == selected; };
+        // 用稳定的显示器 ID 保留选择；暂时断开的显示器也保留一项，避免刷新时丢失配置。
         if (std::ranges::none_of(choices, match))
             choices.push_back({selected, "Disconnected display"});
         if (choices != displays_) {
@@ -275,6 +293,7 @@ private:
             connected_ = true;
             if (immediate_startup_)
                 login_->SetValue(state.settings.login);
+            // 后台刷新和托盘操作保留未保存编辑；窗口内的保存/暂停则接受后端返回的设置。
             if (!dirty_ || (!result.request.from_tray &&
                            (result.request.command == Command::Apply || result.request.command == Command::Pause))) {
                 enabled_->SetValue(state.settings.enabled);
@@ -283,6 +302,7 @@ private:
                 radius_->SetValue(state.settings.radius);
                 for (const auto& [control, value] : options_)
                     control->SetValue(state.settings.*value);
+                // ChangeValue 不触发文本编辑事件，防止回填设置时又被标记为未保存。
                 if (processes_)
                     processes_->ChangeValue(wxString::FromUTF8(state.settings.window_processes));
                 dirty_ = false;
@@ -299,6 +319,7 @@ private:
         wrap_labels();
 #ifdef __WXGTK__
         if (!initial_status_fitted_) {
+            // 首次读取可能带回较长的状态提示；在桌面可用高度内补足窗口高度。
             initial_status_fitted_ = true;
             const auto display = wxDisplay::GetFromWindow(this);
             const auto work = wxDisplay(display == wxNOT_FOUND ? 0u : static_cast<unsigned>(display))
@@ -312,6 +333,7 @@ private:
         commands_.completed(result.request, Schedule::Clock::now());
         controls();
         if (result.request.close_after) {
+            // 处理完退出命令的结果后再强制关闭；有托盘时，平台入口会将普通关闭解释为收起。
             CallAfter([this] { Close(true); });
         }
     }
@@ -331,6 +353,7 @@ private:
         const auto visible_status = dirty_
             ? status_text_ + "\n" + ui_text("Unsaved changes. Select Save to apply them.")
             : status_text_;
+        // 仅在宽度或状态文案变化时重新换行和布局，避免轮询时反复计算。
         if (width == wrap_width_ && last_status_ == visible_status)
             return;
         wrap_width_ = width;
@@ -368,6 +391,7 @@ private:
     bool initial_status_fitted_ = false;
 #endif
     bool connected_ = false;
+    // true 表示控件中有未保存的编辑，后台状态读取不能直接覆盖这些值。
     bool dirty_ = false;
 };
 

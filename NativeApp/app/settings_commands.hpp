@@ -11,7 +11,9 @@
 namespace oled {
 struct CommandRequest {
     Command command = Command::Read;
+    // 托盘请求与窗口内操作使用不同的编辑合并规则，结果中需要保留这个来源。
     bool from_tray = false;
+    // 处理完该命令的结果后退出，用于“退出并还原”流程。
     bool close_after = false;
 };
 
@@ -21,7 +23,7 @@ struct CommandResult {
     std::exception_ptr error;
 };
 
-// Called on the UI thread. The backend must outlive this object and its worker.
+// 由 UI 线程调用；后端的生命周期必须覆盖本对象及其工作线程。
 class SettingsCommands {
 public:
     explicit SettingsCommands(Backend& backend) : backend_(backend) {}
@@ -32,7 +34,7 @@ public:
     std::optional<CommandRequest> next_tray_command();
     std::optional<CommandRequest> next_command(Schedule::Clock::time_point now);
 
-    // Synchronous backends return immediately; worker results are consumed by poll().
+    // 同步后端立即返回结果；使用工作线程的后端由 UI 定时调用 poll() 接收结果。
     std::optional<CommandResult> begin(CommandRequest request, const Settings& settings);
     std::optional<CommandResult> poll();
     void completed(const CommandRequest& request, Schedule::Clock::time_point now);

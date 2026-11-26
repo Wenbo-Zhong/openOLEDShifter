@@ -101,6 +101,7 @@ BOOL CALLBACK collect(HWND window, LPARAM context) noexcept {
             selected.windows.push_back(window);
         return TRUE;
     } catch (...) {
+        // 异常不能穿过 Win32 回调边界；交给枚举调用方在返回 C++ 后重新抛出。
         selected.failure = std::current_exception();
         return FALSE;
     }
@@ -177,6 +178,7 @@ bool same_size(Frame a, Frame b) {
 }
 
 bool owns_position(const Record& record, Frame current) {
+    // 同时核对尺寸和日志中的移动前/后位置，用户重新排布窗口后不再拥有恢复权。
     return same_size(record.original, current) &&
            (current.location == record.previous || current.location == record.next);
 }
@@ -354,6 +356,7 @@ void shift_app_window(HWND window, const fs::path& journal, Offset offset, bool 
     record.previous_normal = normal.location;
     record.next_normal = {normal.location.x + target.x - current.location.x, normal.location.y + target.y - current.location.y};
     save(journal, record);
+    // 记录提交后再核对窗口身份和几何信息，避免覆盖写日志期间发生的拖动或窗口重建。
     if (!same_owner(window, record) || !visible_top_level(window))
         return;
     const auto latest = bounds(window);
@@ -369,6 +372,7 @@ void restore_app_window(const fs::path& journal) {
     const auto window = reinterpret_cast<HWND>(record.id.window);
     if (same_owner(window, record)) {
         if (IsIconic(window)) {
+            // 最小化窗口只恢复“还原后的位置”，不把它强行展开到前台。
             auto current = placement(window);
             const auto normal = frame(current.rcNormalPosition);
             if (same_size(normal, record.normal) &&

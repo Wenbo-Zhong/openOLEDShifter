@@ -54,6 +54,7 @@ void save_autostart(Desktop desktop, bool enabled) {
     constexpr char failure[] = "Could not update OpenOLEDShifter login startup.";
     g_autoptr(GKeyFile) entry = g_key_file_new();
     const bool exists = g_file_test(path, G_FILE_TEST_EXISTS);
+    // 只覆盖或删除带本程序所有权标记的启动项；符号链接和用户自建的同名文件不接管。
     if (g_file_test(path, G_FILE_TEST_IS_SYMLINK) ||
         (exists && (!g_key_file_load_from_file(entry, path, G_KEY_FILE_NONE, nullptr) ||
                     !g_key_file_get_boolean(entry, G_KEY_FILE_DESKTOP_GROUP, startup_marker, nullptr))))
@@ -77,6 +78,7 @@ void save_autostart(Desktop desktop, bool enabled) {
     g_key_file_set_boolean(entry, group, startup_marker, TRUE);
     gsize size = 0;
     g_autofree char* serialized = g_key_file_to_data(entry, &size, nullptr);
+    // 使用临时文件替换提交完整内容，避免异常退出留下不完整的登录启动项。
     if (!g_file_set_contents_full(path, serialized, size, G_FILE_SET_CONTENTS_CONSISTENT, 0600, nullptr))
         throw std::runtime_error(failure);
 }

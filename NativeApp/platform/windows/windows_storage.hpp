@@ -12,6 +12,8 @@
 namespace oled::win {
 std::filesystem::path data_root();
 
+// 先写入并刷新同目录临时文件，再替换正式记录，避免直接覆盖时留下半截恢复数据。
+// 修改桌面状态的调用方必须在系统操作之前成功提交恢复意图。
 inline void atomic_write(const std::filesystem::path& file, std::span<const std::byte> bytes) {
     if (bytes.size() > (std::numeric_limits<DWORD>::max)())
         throw std::length_error("File is too large");

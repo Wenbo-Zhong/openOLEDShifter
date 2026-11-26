@@ -86,6 +86,7 @@ public:
     }
     const char* failure_hint() const override { return "Windows settings operation failed."; }
     DesktopFeatures features() const override { return {true, true, true, true, true, true, true}; }
+    // 与 UI 定时器和会话事件在同一线程串行执行，避免同时修改桌面状态和恢复记录。
     bool use_worker() const override { return false; }
 
     void initialize(bool smoke) {
@@ -104,6 +105,7 @@ public:
         settings_ = std::move(config.settings);
         window_processes_ = std::move(config.window_processes);
         schedule_.reset(settings_.interval, Schedule::Clock::now());
+        // 先处理上次异常退出留下的状态；恢复失败时暂停，不在旧状态上继续位移。
         if (has_pending_recovery()) {
             try {
                 if (vendor_running())
@@ -150,6 +152,7 @@ public:
                 requested.window_processes = win::to_utf8(names);
                 if (has_pending_recovery() && vendor_running())
                     throw std::runtime_error("Close ASUS OLED Shifter before recovering a previous shift");
+                // 修改目标或半径前先恢复旧状态；还原失败时不提交新配置。
                 restore();
                 win::save_config(config_, requested);
                 settings_ = requested;
@@ -257,6 +260,7 @@ private:
         } catch (const std::exception&) {
             return; // A temporary enumeration error does not stop icon and taskbar support.
         }
+        // 显示器或几何信息变化后先恢复已拥有的状态，再按新布局重新计时。
         if (current != displays_) {
             displays_ = std::move(current);
             restore();
@@ -272,6 +276,7 @@ private:
         if (!settings_.wallpaper && !settings_.desktop_icons && !settings_.taskbar_auto_hide &&
             window_processes_.empty() && !settings_.shift_fullscreen_shell)
             return "Paused: select at least one target";
+        // 只暂停自身，避免叠加位移；不终止或禁用用户已有的华硕工具。
         if (vendor_running())
             return "Paused: ASUS OLED Shifter is running";
         if (legacy_needs_recovery(legacy_journal_))
@@ -377,6 +382,7 @@ private:
     }
 
     void restore() {
+        // 各目标独立尝试还原并汇总错误，某个目标失败不能阻止其他目标恢复。
         std::string errors;
         attempt(errors, [&] {
             const auto journals = win::wallpaper_journals(config_.parent_path());

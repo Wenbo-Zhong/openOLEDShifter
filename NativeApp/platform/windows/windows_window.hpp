@@ -10,6 +10,7 @@
 #include <windows.h>
 
 namespace oled::win {
+// 句柄和 PID 都可能复用；同时校验进程创建时间，避免恢复记录命中重启后的其他进程。
 struct WindowIdentity {
     std::uintptr_t window = 0;
     DWORD pid = 0;

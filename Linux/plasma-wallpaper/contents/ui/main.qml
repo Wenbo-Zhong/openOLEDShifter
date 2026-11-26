@@ -41,7 +41,7 @@ WallpaperItem {
     onScaleFactorChanged: reset()
     onImageUrlChanged: reset()
 
-    // Keep the source image under the translated layer to fill its exposed edges.
+    // 本插件只平移自己绘制的图层；底层保留原图，填补平移后露出的边缘。
     Image {
         anchors.fill: parent
         source: root.localImage ? root.imageUrl : ""
@@ -62,6 +62,7 @@ WallpaperItem {
         if (checkingLock)
             return
         checkingLock = true
+        // 锁屏信号会增加代次；较早发出的查询不能用成功回复覆盖更新的锁屏事件。
         const generation = lockGeneration
         DBus.SessionBus.asyncCall({
             service: "org.freedesktop.ScreenSaver", path: "/ScreenSaver",
@@ -114,6 +115,7 @@ WallpaperItem {
             const force = request !== root.lastShiftRequest
             root.lastShiftRequest = request
             const now = Date.now()
+            // 此处 Date.now() 使用系统时钟；时间倒退或轮询中断后重新计时，不补执行过期位移。
             if (now < root.lastPoll || now - root.lastPoll > 3000) {
                 root.reset()
                 return
@@ -125,6 +127,7 @@ WallpaperItem {
                 root.offsetY = 0
             }
             if (step.offset) {
+                // 共享策略输出物理像素；每次写入相对原点的逻辑偏移，不能累加到现有平移。
                 root.offsetX = step.offset[0] / root.scaleFactor
                 root.offsetY = step.offset[1] / root.scaleFactor
             }

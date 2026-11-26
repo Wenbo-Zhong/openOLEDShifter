@@ -19,6 +19,7 @@ inline constexpr int min_radius = 1;
 inline constexpr int max_radius = 8;
 
 struct Offset {
+    // 相对稳定原点的物理像素偏移；桌面后端负责换算逻辑坐标，不能叠加到上一次位置。
     int x, y;
     bool operator==(const Offset&) const = default;
 };
@@ -26,9 +27,11 @@ struct Offset {
 struct Frame {
     Offset offset;
     int point_index;
+    // 往返周期中的下一相位，不是螺旋点序号；同一坐标在去程和回程中有不同相位。
     int next_phase;
 };
 
+// 轨迹与默认值是各平台的共同来源；Linux 插件数据由 tools/generate_policy.cpp 生成。
 inline std::vector<Frame> make_cycle(int radius) {
     if (radius < min_radius || radius > max_radius)
         throw std::out_of_range("shift radius");
@@ -39,6 +42,7 @@ inline std::vector<Frame> make_cycle(int radius) {
     std::vector<Offset> points{{0, 0}};
     Offset point{0, 0};
     int direction = 0;
+    // 每个步长走两条边后再增长，直到填满半径范围内的方形螺旋。
     for (int length = 1; static_cast<int>(points.size()) < count; ++length) {
         for (int leg = 0; leg < 2; ++leg) {
             const auto delta = directions[direction++ % directions.size()];
@@ -50,6 +54,7 @@ inline std::vector<Frame> make_cycle(int radius) {
         }
     }
 
+    // 端点只出现一次：到达端点即反向，避免端点重复导致多等待一次位移间隔。
     const int period = 2 * (count - 1);
     std::vector<Frame> frames;
     frames.reserve(period);
@@ -66,6 +71,7 @@ struct Decision {
     bool reset_deadline;
 };
 
+// changed 表示暂停原因变化，was_blocked 表示上次处于暂停；force 也不能绕过暂停条件。
 constexpr Decision transition(bool blocked, bool changed, bool was_blocked, bool due, bool force) {
     const bool restore = blocked && changed;
     const bool shift = !blocked && (force || (due && !was_blocked));
@@ -74,6 +80,7 @@ constexpr Decision transition(bool blocked, bool changed, bool was_blocked, bool
 
 class Schedule {
 public:
+    // 使用单调时钟，避免系统时间校正改变位移间隔。
     using Clock = std::chrono::steady_clock;
 
     Schedule(int seconds, Clock::time_point now) { reset(seconds, now); }
@@ -87,6 +94,7 @@ public:
     }
 
     Decision poll(Clock::time_point now, std::string_view pause, bool force = false) {
+        // 解除暂停后重新等待完整间隔，不补执行暂停期间错过的位移。
         const auto next = transition(!pause.empty(), pause != pause_, !pause_.empty(), now >= due_, force);
         pause_ = pause;
         if (next.reset_deadline)

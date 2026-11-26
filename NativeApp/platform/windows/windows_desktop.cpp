@@ -58,6 +58,7 @@ void save_icon_record(const fs::path& path, const IconRecord& record) {
 }
 
 bool owns_icon_position(const IconRecord& record, const LayerPosition& current) {
+    // 日志先于位移提交，异常退出可能留下移动前或移动后的坐标；尺寸变化则视为外部修改。
     return current.width == record.width && current.height == record.height &&
            (current.origin == record.next || current.origin == record.previous);
 }
@@ -145,12 +146,14 @@ void shift_icon_layer(HWND layer, const fs::path& journal, Offset offset) {
         if (record.id != id || record.parent != parent_id || !owns_icon_position(record, position))
             throw std::runtime_error("Desktop icon layer changed outside OpenOLEDShifter");
     }
+    // 始终从首次记录的原点计算，避免连续位移累积漂移。
     const Offset target{record.origin.x + offset.x, record.origin.y + offset.y};
     if (target == position.origin)
         return;
     record.previous = position.origin;
     record.next = target;
     save_icon_record(journal, record);
+    // 写入日志期间 Explorer 仍可能改变图层；系统操作前再次核对身份、父窗口和位置。
     if (identify(layer) != id || GetParent(layer) != parent ||
         layer_position(layer, parent).origin != position.origin)
         throw std::runtime_error("Desktop icon layer changed while preparing shift");
@@ -162,6 +165,7 @@ void restore_icon_layer(HWND layer, const fs::path& journal) {
         return;
     const auto record = read_icon_record(journal);
     const auto recorded = reinterpret_cast<HWND>(record.id.window);
+    // 原对象仍存在但暂时找不到图层时保留日志，后续再恢复。
     if (!layer && identify(recorded) == record.id)
         throw std::runtime_error("Desktop icon layer is temporarily unavailable");
     if (identify(layer) == record.id) {
@@ -206,6 +210,7 @@ void restore_taskbar(const Taskbar& taskbar, const fs::path& journal) {
     const auto recorded = reinterpret_cast<HWND>(record.id.window);
     if (!tray && identify(recorded) == record.id)
         throw std::runtime_error("Windows taskbar is temporarily unavailable");
+    // 只撤销仍由本程序持有的自动隐藏状态，尊重用户之后的任务栏修改。
     if (identify(tray) == record.id && taskbar.state(tray) == record.changed)
         taskbar.set_state(tray, record.original);
     fs::remove(journal);

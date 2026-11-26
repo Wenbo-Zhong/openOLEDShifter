@@ -34,6 +34,7 @@ int main(int argc, char** argv) try {
     schema_file << schema;
     schema_file.close();
 
+    // 插件读取生成数据而不另写轨迹/调度规则；修改策略时应修改共享核心并重新生成。
     std::ofstream js;
     js.exceptions(std::ios::failbit | std::ios::badbit);
     js.open(argv[3], std::ios::binary);
@@ -51,11 +52,13 @@ int main(int argc, char** argv) try {
             if (phase != 0)
                 js << ',';
             const auto& frame = frames[phase];
+            // 数组契约为 [物理像素 x, 物理像素 y, 下一相位]，与 Linux/shared/shift-runtime.js 对应。
             js << '[' << frame.offset.x << ',' << frame.offset.y << ',' << frame.next_phase << ']';
         }
         js << ']';
     }
     js << "};\nexport const scheduleTransitions = [" << std::boolalpha;
+    // 位顺序必须与 JS 运行时一致：暂停、原因变化、上次暂停、到期、强制位移。
     for (int flags = 0; flags < 32; ++flags) {
         if (flags != 0)
             js << ',';

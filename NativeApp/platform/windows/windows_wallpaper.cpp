@@ -85,6 +85,7 @@ fs::path cache_slot(const fs::path& journal, const wchar_t* suffix) {
 }
 
 bool owns(const Record& record, const std::wstring& current) {
+    // 日志先于 SetWallpaper 提交，移动前后两个缓存路径都可能是异常退出后的合法状态。
     return equal_path(record.next, current) ||
            (!record.previous.empty() && equal_path(record.previous, current));
 }
@@ -161,6 +162,7 @@ void shift_wallpaper(IDesktopWallpaper& api, const std::wstring& monitor,
     if (existing && !equal_path(existing->monitor, monitor))
         throw std::runtime_error("Wallpaper journal belongs to another monitor");
     const bool previously_owned = existing && owns(*existing, current);
+    // 仍持有壁纸时沿用原图；用户换图后以新图为基准，不能把旧恢复记录覆盖到新壁纸上。
     const auto original = previously_owned ? existing->original : current;
     if (original.empty() || !fs::is_regular_file(original))
         throw std::runtime_error("Source wallpaper is missing");
@@ -168,6 +170,7 @@ void shift_wallpaper(IDesktopWallpaper& api, const std::wstring& monitor,
     const auto second = cache_slot(journal, L".b.png");
     if (equal_path(original, first.wstring()) || equal_path(original, second.wstring()))
         throw std::runtime_error("Original wallpaper points to a shift cache file");
+    // 两个缓存交替使用，避免重写当前仍被桌面读取的图片；每次都从原图重新渲染。
     const auto output = equal_path(current, first.wstring()) ? second : first;
     RECT bounds{};
     COLORREF color{};
@@ -179,7 +182,7 @@ void shift_wallpaper(IDesktopWallpaper& api, const std::wstring& monitor,
     render_wallpaper(original, output, bounds.right - bounds.left, bounds.bottom - bounds.top, mode, color, offset);
     if (!equal_path(current_wallpaper(api, monitor), current))
         throw std::runtime_error("Wallpaper changed while preparing shift");
-    // Both paths are recoverable if the process exits on either side of SetWallpaper.
+    // 先保存原图及移动前/后的所属状态，确保 SetWallpaper 前后异常退出都能判断是否仍可恢复。
     save(journal, {monitor, original, previously_owned ? current : L"", output.wstring()});
     check(api.SetWallpaper(monitor.c_str(), output.c_str()), "Apply shifted wallpaper");
 }
@@ -192,8 +195,10 @@ bool restore_wallpaper(IDesktopWallpaper& api, const fs::path& journal,
     const auto monitor = std::ranges::find_if(active_monitors, [&](const auto& id) {
         return equal_path(id, record->monitor);
     });
+    // 显示器断开时保留恢复记录，重连后再核对该屏幕的壁纸所有权。
     if (monitor == active_monitors.end())
         return false;
+    // 用户已换壁纸时只移除旧日志；不能用旧原图覆盖用户的新选择。
     if (owns(*record, current_wallpaper(api, *monitor))) {
         if (!fs::is_regular_file(record->original))
             throw std::runtime_error("Original wallpaper is missing; recovery journal retained");

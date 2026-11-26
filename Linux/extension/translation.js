@@ -11,6 +11,7 @@ export class WallpaperTranslation {
     }
 
     owns() {
+        // 只有当前平移仍等于最后写入值时才拥有恢复权，不能覆盖其他组件之后的位移。
         return this.actor && this.actor.get_translation()
             .every((value, index) => value === this.last[index]);
     }
@@ -19,8 +20,8 @@ export class WallpaperTranslation {
         if (!this.owns())
             return false;
 
-        // Writable recovery intent belongs to the same Shell process as the
-        // mutation. A process exit destroys the actor and its translation.
+        // 恢复意图与 actor 同属 Shell 进程；进程退出会一起销毁，源壁纸文件和设置无需改写。
+        // 物理像素除以各屏缩放得到逻辑坐标；fround 对齐 actor 的浮点存储，便于精确核对所有权。
         this.last = [Math.fround(x / scale), Math.fround(y / scale), 0];
         this.actor.set_translation(...this.last);
         return true;
@@ -60,7 +61,7 @@ export class WallpaperTranslations {
             for (const {actor, scale} of targets)
                 this.#entries.set(actor, {scale, translation: new WallpaperTranslation(actor)});
         }
-        // Check all actors before changing any output.
+        // 先检查所有屏幕的 actor，再开始写入；一屏失去所有权时停止并恢复仍属于本程序的其他屏。
         if (targets.some(({actor}) => this.isBlocked(actor) || !this.#entries.get(actor).translation.owns())) {
             this.release();
             return false;
@@ -73,6 +74,7 @@ export class WallpaperTranslations {
 
     release() {
         for (const {translation} of this.#entries.values()) {
+            // 同一个 actor 被外部接管后不再尝试位移；换壁纸生成新 actor 后可以重新建立所有权。
             if (translation.actor && !translation.owns())
                 this.#blocked.add(translation.actor);
             translation.release();

@@ -19,6 +19,7 @@ struct Settings {
     bool pause_fullscreen = true;
 };
 
+// 只报告后端实际实现的能力；界面据此创建控件，不能仅增加开关就宣称支持新功能。
 struct DesktopFeatures {
     bool wallpaper_toggle = false;
     bool desktop_icons = false;
@@ -53,6 +54,7 @@ public:
     virtual const char* login_label() const { return "Start shifting at login"; }
     virtual bool supports_login_startup() const { return true; }
     virtual bool supports_manual_shift() const { return true; }
+    // true 时命令队列在工作线程调用后端；false 时与 UI 和平台事件在主线程串行执行。
     virtual bool use_worker() const { return true; }
     virtual State call(Command command, const Settings& settings) = 0;
 };
