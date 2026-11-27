@@ -20,7 +20,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-dev libjson-glib-dev libayatana-appindicator3-dev gjs libglib2.0-bin desktop-file-utils rpm zip unzip
+          sudo apt-get install -y --no-install-recommends cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-dev libjson-glib-dev libayatana-appindicator3-dev gjs libglib2.0-bin desktop-file-utils rpm
       - name: Build DEB and RPM
         run: |
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
@@ -31,23 +31,24 @@ jobs:
         run: |
           dpkg-deb --contents release/ubuntu/*.deb > deb-contents.txt
           rpm --query --package --list release/ubuntu/*.rpm > rpm-contents.txt
-          unzip -t release/ubuntu/*.shell-extension.zip
-          unzip -t release/ubuntu/openoledshifter-plasma.zip
           for path in /usr/lib/openoledshifter/OpenOLEDShifter \
                       /usr/share/applications/org.openoledshifter.Desktop.desktop \
                       /usr/share/icons/hicolor/512x512/apps/org.openoledshifter.Desktop.png \
-                      /usr/share/plasma/wallpapers/org.openoledshifter.wallpaper/contents/ui/policy.js \
-                      /usr/share/gnome-shell/extensions/openoledshifter@openoledshifter/schemas/gschemas.compiled; do
+                      /usr/lib/openoledshifter/plugins/plasma/org.openoledshifter.wallpaper/.openoledshifter-managed \
+                      /usr/lib/openoledshifter/plugins/plasma/org.openoledshifter.wallpaper/contents/ui/policy.js \
+                      /usr/lib/openoledshifter/plugins/gnome/openoledshifter@openoledshifter/.openoledshifter-managed \
+                      /usr/lib/openoledshifter/plugins/gnome/openoledshifter@openoledshifter/schemas/gschemas.compiled; do
             grep -Fq ".$path" deb-contents.txt
             grep -Fxq "$path" rpm-contents.txt
           done
+          if grep -E '/usr/share/(gnome-shell/extensions|plasma/wallpapers)/' deb-contents.txt rpm-contents.txt; then
+            exit 1
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openoledshifter-linux-x64
           path: |
             release/ubuntu/*.deb
             release/ubuntu/*.rpm
-            release/ubuntu/*.shell-extension.zip
-            release/ubuntu/openoledshifter-plasma.zip
           if-no-files-found: error
           compression-level: 0

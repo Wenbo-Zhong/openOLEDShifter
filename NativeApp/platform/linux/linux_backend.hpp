@@ -8,6 +8,7 @@ namespace oled::linux_desktop {
 enum class Desktop { Gnome, Plasma };
 
 bool plugin_installed(const char* directory, const char* id);
+bool install_bundled_plugin(Desktop desktop, const char* id);
 bool autostart_enabled(Desktop desktop);
 void save_autostart(Desktop desktop, bool enabled);
 

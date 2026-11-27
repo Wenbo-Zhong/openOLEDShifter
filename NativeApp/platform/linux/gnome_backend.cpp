@@ -35,10 +35,10 @@ bool extension_installed() {
     g_autoptr(GVariant) fields = g_variant_get_child_value(info, 0);
     if (g_variant_n_children(fields) == 0) {
         if (!extension_installed())
-            throw std::runtime_error("Wallpaper extension files are missing. Reinstall the OpenOLEDShifter package.");
+            throw std::runtime_error("Click Install or enable GNOME extension to install it for your account.");
         throw std::runtime_error(
             "The wallpaper extension is installed but not loaded in this session. Save your work, sign out, and sign back in.\n"
-            "After signing back in, open OpenOLEDShifter and click Enable wallpaper extension.");
+            "After signing back in, open OpenOLEDShifter and click Install or enable GNOME extension.");
     }
 
     gboolean enabled = FALSE;
@@ -47,8 +47,7 @@ bool extension_installed() {
             "The wallpaper extension is enabled but not responding. Sign out and back in to load the installed version.");
 
     throw std::runtime_error(
-        "The wallpaper extension is disabled. Run this command as your desktop user.\n"
-        "gnome-extensions enable openoledshifter@openoledshifter");
+        "The wallpaper extension is disabled. Click Install or enable GNOME extension.");
 }
 
 // Shell 中加载的扩展版本可能与应用不同；响应必须校验字段类型和设置范围后才能进入共享状态。
@@ -68,11 +67,17 @@ class GnomeBackend final : public Backend {
         return "Wallpaper shifting is unavailable. The tray still works.";
     }
 
-    const char* setup_label() const override { return "Enable wallpaper extension"; }
+    const char* setup_label() const override { return "Install or enable GNOME extension"; }
 
     DesktopFeatures features() const override { return {.fullscreen_pause = true}; }
 
     State call(Command command, const Settings& settings) override {
+        if (command == Command::Setup &&
+            linux_desktop::install_bundled_plugin(linux_desktop::Desktop::Gnome, extension_id))
+            throw std::runtime_error(
+                "The GNOME extension was installed or updated. Sign out and back in to load it.\n"
+                "After signing back in, open OpenOLEDShifter and click Install or enable GNOME extension.");
+
         GError* error = nullptr;
         g_autoptr(GDBusConnection) connection = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
         if (!connection)

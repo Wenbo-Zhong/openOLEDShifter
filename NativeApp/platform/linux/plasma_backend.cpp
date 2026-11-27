@@ -17,27 +17,25 @@ class PlasmaBackend final : public Backend {
     const char* failure_hint() const override { return "Set up the Plasma wallpaper plugin"; }
     DesktopFeatures features() const override { return {.fullscreen_pause = true}; }
     const char* login_label() const override { return "Start KDE tray at login"; }
-    const char* setup_label() const override { return "Open Plasma wallpaper settings"; }
+    const char* setup_label() const override { return "Install or configure Plasma plugin"; }
 
     State call(Command command, const Settings& requested) override {
         if (command == Command::Setup) {
-            if (plasma_wallpaper_installed()) {
-                g_autoptr(GSubprocess) settings = g_subprocess_new(G_SUBPROCESS_FLAGS_NONE, nullptr,
-                    "systemsettings", "kcm_wallpaper", nullptr);
-                if (!settings)
-                    throw std::runtime_error("Open wallpaper settings from the Plasma desktop menu.");
-            }
-            return call(Command::Read, {});
+            const bool changed = linux_desktop::install_bundled_plugin(linux_desktop::Desktop::Plasma, plugin_id);
+            g_autoptr(GSubprocess) settings = g_subprocess_new(G_SUBPROCESS_FLAGS_NONE, nullptr,
+                "systemsettings", "kcm_wallpaper", nullptr);
+            if (!settings)
+                throw std::runtime_error("Open wallpaper settings from the Plasma desktop menu.");
+            auto state = call(Command::Read, {});
+            if (changed)
+                state.status += "\nSign out and back in to reload the Plasma plugin on displays already using it.";
+            return state;
         }
         if (command != Command::Read && command != Command::Apply &&
             command != Command::Pause && command != Command::Toggle && command != Command::Shift)
             return {};
         if (!plasma_wallpaper_installed())
-            throw std::runtime_error(
-                std::string("Use the openoledshifter-plasma.zip package.\n") +
-                "Extract the archive into the following folder. Create it if needed.\n"
-                + g_get_user_data_dir() + "/plasma/wallpapers/\n"
-                "Then reopen this window to check the installation.");
+            throw std::runtime_error("Click Install or configure Plasma plugin to install it for your account.");
 
         g_autoptr(GDBusConnection) connection = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
         if (!connection)

@@ -33,7 +33,7 @@ temporary=
 trap 'rm -rf -- "$stage"; if [[ -n "$temporary" ]]; then rm -f -- "$temporary"; fi' EXIT
 
 app="$stage/usr/lib/$name"
-extension="$stage/usr/share/gnome-shell/extensions/$uuid"
+extension="$app/plugins/gnome/$uuid"
 install -d "$extension/schemas"
 install -m 0644 Linux/extension/{extension,translation}.js Linux/extension/metadata.json "$extension/"
 install -Dm0644 "Linux/packaging/$desktop_id.desktop" "$stage/usr/share/applications/$desktop_id.desktop"
@@ -55,20 +55,11 @@ rm "$extension/shift-runtime-test.js"
 gjs -m Linux/translation-test.js
 desktop-file-validate "$stage/usr/share/applications/$desktop_id.desktop"
 
-plasma="$stage/usr/share/plasma/wallpapers/org.openoledshifter.wallpaper"
+plasma="$app/plugins/plasma/org.openoledshifter.wallpaper"
 bash Linux/packaging/stage-plasma.sh "$extension/cycles.js" "$plasma"
-for source in "$extension" "$plasma"; do
-    if [[ "$source" == "$extension" ]]; then
-        bundle="$uuid.shell-extension.zip"
-    else
-        bundle=openoledshifter-plasma.zip
-    fi
-    if [[ "$source" == "$plasma" ]]; then
-        (cd "$(dirname "$source")" && zip -qr "$stage/$bundle" "$(basename "$source")")
-    else
-        (cd "$source" && zip -qr "$stage/$bundle" .)
-    fi
-    mv "$stage/$bundle" "$output/"
+for plugin in "$extension" "$plasma"; do
+    (cd "$plugin" && find . -type f ! -name .openoledshifter-managed -print0 |
+        LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1) > "$plugin/.openoledshifter-managed"
 done
 
 install -Dm0755 "$stage/native-build/OpenOLEDShifter" "$app/OpenOLEDShifter"

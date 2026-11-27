@@ -5,11 +5,15 @@
 #include <gio/gdesktopappinfo.h>
 #include <glib/gstdio.h>
 #include <cerrno>
+#include <fcntl.h>
+#include <filesystem>
 
 namespace oled::linux_desktop {
 namespace {
 constexpr char application_id[] = "org.openoledshifter.Desktop.desktop";
 constexpr char startup_marker[] = "X-OpenOLEDShifter-Managed";
+constexpr char plugin_marker[] = ".openoledshifter-managed";
+namespace fs = std::filesystem;
 
 const char* startup_filename(Desktop desktop) {
     return desktop == Desktop::Plasma ? "org.openoledshifter.Desktop-kde.desktop" : application_id;
@@ -38,6 +42,63 @@ bool plugin_installed(const char* directory, const char* id) {
         if (installed_in(*directories))
             return true;
     return false;
+}
+
+bool install_bundled_plugin(Desktop desktop, const char* id) {
+    const bool plasma = desktop == Desktop::Plasma;
+    g_autofree char* executable = g_file_read_link("/proc/self/exe", nullptr);
+    constexpr char missing[] = "The bundled plugin is missing. Reinstall the OpenOLEDShifter package.";
+    constexpr char failure[] = "Could not install the plugin in your user data directory.";
+    if (!executable)
+        throw std::runtime_error(missing);
+    const auto source = fs::path(executable).parent_path() / "plugins" / (plasma ? "plasma" : "gnome") / id;
+    g_autofree char* version = nullptr;
+    if (!g_file_get_contents((source / plugin_marker).c_str(), &version, nullptr, nullptr))
+        throw std::runtime_error(missing);
+
+    const auto parent = fs::path(g_get_user_data_dir()) / (plasma ? "plasma/wallpapers" : "gnome-shell/extensions");
+    const auto destination = parent / id;
+    bool updating = false;
+    try {
+        fs::create_directories(parent);
+        const auto status = fs::symlink_status(destination);
+        updating = fs::exists(status);
+        if (updating) {
+            g_autofree char* installed = nullptr;
+            const auto marker = destination / plugin_marker;
+            if (!fs::is_directory(status) || !fs::is_regular_file(fs::symlink_status(marker)) ||
+                !g_file_get_contents(marker.c_str(), &installed, nullptr, nullptr))
+                throw std::runtime_error(std::string("Move the existing plugin folder aside, then click the install button again.") +
+                    "\n" + destination.string());
+            if (g_str_equal(installed, version) && fs::is_regular_file(destination / "metadata.json"))
+                return false;
+        }
+    } catch (const fs::filesystem_error& error) {
+        g_debug("%s", error.what());
+        throw std::runtime_error(failure);
+    }
+
+    // 暂存与目标位于同一文件系统，更新时原子交换完整目录，保留原有目录直到新副本就绪。
+    auto pattern = (parent / ".openoledshifter-install-XXXXXX").string();
+    if (!g_mkdtemp(pattern.data()))
+        throw std::runtime_error(failure);
+    const auto staged = fs::path(pattern) / id;
+    try {
+        fs::copy(source, staged, fs::copy_options::recursive);
+        if (renameat2(AT_FDCWD, staged.c_str(), AT_FDCWD, destination.c_str(),
+                      updating ? RENAME_EXCHANGE : RENAME_NOREPLACE) != 0)
+            throw std::system_error(errno, std::generic_category());
+    } catch (const std::system_error& error) {
+        std::error_code ignored;
+        fs::remove_all(pattern, ignored);
+        g_debug("%s", error.what());
+        throw std::runtime_error(failure);
+    }
+    std::error_code cleanup_error;
+    fs::remove_all(pattern, cleanup_error);
+    if (cleanup_error)
+        g_debug("Could not clean up the plugin staging directory: %s", cleanup_error.message().c_str());
+    return true;
 }
 
 bool autostart_enabled(Desktop desktop) {

@@ -26,7 +26,5 @@ cp -a "%{payload}/usr" "%{buildroot}/"
 /usr/lib/openoledshifter
 /usr/share/applications/org.openoledshifter.Desktop.desktop
 /usr/share/icons/hicolor/512x512/apps/org.openoledshifter.Desktop.png
-/usr/share/gnome-shell/extensions/openoledshifter@openoledshifter
-/usr/share/plasma/wallpapers/org.openoledshifter.wallpaper
 %dir /usr/share/doc/openoledshifter
 %license /usr/share/doc/openoledshifter/copyright

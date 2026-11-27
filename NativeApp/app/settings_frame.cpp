@@ -209,11 +209,8 @@ private:
     }
 
     void controls() {
-        if (setup_) {
-            if (setup_->Show(!connected_))
-                panel_->Layout();
+        if (setup_)
             setup_->Enable(!commands_.busy());
-        }
         for (auto* button : buttons_)
             button->Enable(connected_ && !commands_.busy());
         // 后台读状态时仍可编辑；修改后端的命令执行期间暂时禁用编辑，避免相互覆盖。
@@ -286,6 +283,8 @@ private:
     }
 
     void complete(CommandResult result) {
+        if (result.request.command != Command::Read)
+            setup_error_.clear();
         try {
             if (result.error)
                 std::rethrow_exception(result.error);
@@ -313,8 +312,12 @@ private:
         } catch (const std::exception& error) {
             connected_ = false;
             status_text_ = ui_text(desktop_backend().failure_hint());
-            if (*error.what())
-                status_text_ += "\n" + ui_status(error.what());
+            if (*error.what()) {
+                const auto message = ui_status(error.what());
+                status_text_ += "\n" + message;
+                if (result.request.command == Command::Setup)
+                    setup_error_ = message;
+            }
         }
         wrap_labels();
 #ifdef __WXGTK__
@@ -350,9 +353,9 @@ private:
                     group->SetProportion(wide ? 1 : 0);
             }
         }
-        const auto visible_status = dirty_
-            ? status_text_ + "\n" + ui_text("Unsaved changes. Select Save to apply them.")
-            : status_text_;
+        auto visible_status = setup_error_.empty() ? status_text_ : setup_error_;
+        if (dirty_)
+            visible_status += "\n" + ui_text("Unsaved changes. Select Save to apply them.");
         // 仅在宽度或状态文案变化时重新换行和布局，避免轮询时反复计算。
         if (width == wrap_width_ && last_status_ == visible_status)
             return;
@@ -372,6 +375,7 @@ private:
     bool immediate_startup_ = false;
     wxStaticText* note_ = nullptr;
     wxString status_text_ = ui_text("Loading settings…");
+    wxString setup_error_;
     wxString last_status_;
     int wrap_width_ = 0;
     wxTimer timer_;

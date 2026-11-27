@@ -16,9 +16,9 @@ Windows 和 Ubuntu 默认发布 **C++ + wxWidgets** 原生版。`NativeApp/` 按
 
 ## Linux 自动打包
 
-向 `main` 推送、提交 Pull Request、推送 `vX.Y.Z` 标签或手动运行工作流时，GitHub Actions 自动构建 x64 的 DEB 和 RPM。标签构建使用标签中的版本号。在对应运行的 **Artifacts** 中下载 `openoledshifter-linux-x64`，解压可以得到 DEB、RPM、GNOME 扩展 ZIP 和 Plasma 壁纸插件 ZIP。[GitHub Actions](https://github.com/Wenbo-Zhong/openOLEDShifter/actions)
+向 `main` 推送、提交 Pull Request、推送 `vX.Y.Z` 标签或手动运行工作流时，GitHub Actions 自动构建 x64 的 DEB 和 RPM。标签构建使用标签中的版本号。在对应运行的 **Artifacts** 中下载 `openoledshifter-linux-x64`，解压可以得到 DEB 和 RPM。[GitHub Actions](https://github.com/Wenbo-Zhong/openOLEDShifter/actions)
 
-DEB 面向 Ubuntu 26.04。RPM 面向使用 GNOME 50 Wayland 的 Fedora 44，可用 `sudo dnf install ./openoledshifter-0.1.0-1.x86_64.rpm` 安装。DEB 和 RPM 都会安装两种桌面插件，并注册 **OpenOLEDShifter** 应用菜单入口。系统加载扩展后，按下面的步骤启用壁纸位移。
+DEB 面向 Ubuntu 26.04。RPM 面向使用 GNOME 50 Wayland 的 Fedora 44，可用 `sudo dnf install ./openoledshifter-0.1.0-1.x86_64.rpm` 安装。DEB 和 RPM 都内置两种桌面插件，并注册 **OpenOLEDShifter** 应用菜单入口。登录 GNOME 或 KDE 后，在应用里点击安装按钮，程序会把该桌面的插件复制到当前用户的数据目录。升级 DEB 或 RPM 后，再点击一次按钮即可更新由应用安装的插件。若已有手工安装的同名目录，界面会提示先移走备份。
 
 本地可用 `./build-ubuntu.sh all` 构建两个包，或用 `./build-ubuntu.sh rpm` 单独构建 RPM。RPM 构建额外需要 `rpmbuild`（Ubuntu 的 `rpm` 包）。
 
@@ -35,11 +35,7 @@ sudo apt install cmake g++ pkg-config libwxgtk3.2-dev libgtk-3-dev libglib2.0-de
 sudo apt install ./release/ubuntu/openoledshifter_0.1.0_amd64.deb
 ```
 
-安装后，在 GNOME 应用面板搜索 **OpenOLEDShifter**，点击「启用壁纸位移扩展」。如果当前会话还没发现扩展，按提示先注销并重新登录，再点击该按钮。也可在终端以桌面用户身份启用：
-
-```bash
-gnome-extensions enable openoledshifter@openoledshifter
-```
+安装后，在 GNOME 应用面板搜索 **OpenOLEDShifter**，点击「安装或启用 GNOME 扩展」。首次安装或更新后，按提示注销并重新登录，再点击同一按钮启用扩展。
 
 从应用面板或 OpenOLEDShifter 托盘菜单打开设置，勾选 **启用定时位移** 并保存。Ubuntu 已提供 AppIndicator 托盘支持。关闭设置窗口会收起到系统托盘，托盘菜单可重新打开设置或退出。启用 OpenOLEDShifter 扩展后，托盘也可控制暂停、继续和立即位移。登录自动开始默认为关闭。勾选「登录时启动位移和托盘」并保存后，应用会在下次登录时在托盘启动，扩展会开始定时位移。从旧版升级时，已勾选过这一项的用户需要重新保存一次以登记托盘启动。
 
@@ -52,21 +48,15 @@ gnome-extensions disable openoledshifter@openoledshifter
 sudo apt remove openoledshifter
 ```
 
-如需清除本扩展的个人设置，执行 `dconf reset -f /org/gnome/shell/extensions/openoledshifter/`。如曾通过旧版 `install-ubuntu.sh` 做用户级安装，先用旧版脚本的 `--uninstall` 选项移除，以免旧入口覆盖软件包提供的入口。
+如需移除用户级扩展文件，可在停用后用 GNOME 扩展管理工具卸载，或移除应用安装的 `${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/openoledshifter@openoledshifter` 目录。如需清除本扩展的个人设置，执行 `dconf reset -f /org/gnome/shell/extensions/openoledshifter/`。如曾通过旧版 `install-ubuntu.sh` 做用户级安装，先用旧版脚本的 `--uninstall` 选项移除，以免旧入口覆盖软件包提供的入口。
 
 ## KDE Plasma 6 / X11
 
 KDE 使用独立的 **OpenOLEDShifter 壁纸插件**。它适配 Plasma 6 的壁纸层，沿用 Windows 和 GNOME 共同的位移轨迹、默认设置和调度规则。每个显示器可在 Plasma 壁纸设置中单独选择和配置。插件只移动自己绘制的本地静态图片，桌面图标、面板和窗口位移暂不支持。
 
-在仓库根目录运行 `./build-plasma.sh`，生成 `release/ubuntu/openoledshifter-plasma.zip`。也可从 Linux 流水线的 Artifacts 下载。若已安装新 DEB 或 RPM，应用会检测系统自带的插件，并提供「打开 Plasma 壁纸设置」入口。选择壁纸类型后再启用位移。只安装 ZIP 时，解压到当前用户的壁纸目录。新版 ZIP 自带插件目录层级：
+在 Plasma 会话打开 **OpenOLEDShifter**，点击「安装或配置 Plasma 插件」。程序会把插件安装到当前用户的壁纸插件目录，并打开 Plasma 壁纸设置。
 
-```bash
-plugin="${XDG_DATA_HOME:-$HOME/.local/share}/plasma/wallpapers/"
-mkdir -p "$plugin"
-unzip -o ./release/ubuntu/openoledshifter-plasma.zip -d "$plugin"
-```
-
-右键桌面进入壁纸设置，选择 **OpenOLEDShifter**。如果该屏正在使用 Plasma 的「图片」壁纸，插件会尝试预填当前图片。未识别到图片时可手动选择本地文件。勾选启用位移并应用。安装后如果列表未刷新，关闭并重开壁纸设置。新版应用提供立即位移、前台全屏时暂停和登录 KDE 时后台启动托盘。手动解压过插件的用户也要更新用户目录里的插件，避免 Plasma 继续加载旧副本。停止时取消勾选，移除插件前先切换回原来的壁纸类型。当前支持范围以 Plasma 6 / X11 为主，Plasma Wayland、其他 X11 桌面和分数缩放的物理精度仍需单独验证。
+右键桌面进入壁纸设置，选择 **OpenOLEDShifter**。如果该屏正在使用 Plasma 的「图片」壁纸，插件会尝试预填当前图片。未识别到图片时可手动选择本地文件。勾选启用位移并应用。安装后如果列表未刷新，关闭并重开壁纸设置。新版应用提供立即位移、前台全屏时暂停和登录 KDE 时后台启动托盘。已在使用插件的屏幕可在重新登录后加载新版。停止时取消勾选。卸载前先关闭登录启动并保存，将各屏切回原来的壁纸类型，再移除应用安装的 `${XDG_DATA_HOME:-$HOME/.local/share}/plasma/wallpapers/org.openoledshifter.wallpaper` 目录。当前支持范围以 Plasma 6 / X11 为主，Plasma Wayland、其他 X11 桌面和分数缩放的物理精度仍需单独验证。
 
 ## Windows 使用
 
